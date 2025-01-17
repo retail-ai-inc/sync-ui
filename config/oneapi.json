@@ -74,7 +74,7 @@
     },
     "/api/login/outLogin": {
       "post": {
-        "description": "登录接口",
+        "description": "退出登录接口",
         "operationId": "outLogin",
         "tags": ["login"],
         "responses": {
@@ -145,10 +145,10 @@
       "x-swagger-router-controller": "api"
     },
     "/api/notices": {
-      "summary": "getNotices",
-      "description": "NoticeIconItem",
       "get": {
         "tags": ["api"],
+        "summary": "获取通知列表",
+        "description": "获取通知列表",
         "operationId": "getNotices",
         "responses": {
           "200": {
@@ -239,7 +239,7 @@
       },
       "put": {
         "tags": ["rule"],
-        "description": "新建规则",
+        "description": "更新规则",
         "operationId": "updateRule",
         "responses": {
           "200": {
@@ -295,6 +295,403 @@
     },
     "/swagger": {
       "x-swagger-pipe": "swagger_raw"
+    },
+    "/api/sync": {
+      "get": {
+        "tags": ["sync"],
+        "description": "获取数据同步任务列表",
+        "operationId": "getSyncList",
+        "responses": {
+          "200": {
+            "description": "成功获取同步任务列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncListResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["sync"],
+        "description": "创建新的数据同步任务",
+        "operationId": "createSyncTask",
+        "requestBody": {
+          "description": "新建数据同步任务的参数",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSyncTask"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "成功创建同步任务",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateSyncTaskResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "错误响应",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sync/{id}/start": {
+      "put": {
+        "tags": ["sync"],
+        "description": "启动数据同步任务",
+        "operationId": "startSync",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "同步任务的ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功启动同步任务",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StartSyncResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "错误响应",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sync/{id}/stop": {
+      "put": {
+        "tags": ["sync"],
+        "description": "停止数据同步任务",
+        "operationId": "stopSync",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "同步任务的ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功停止同步任务",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StopSyncResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "错误响应",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sync/{id}/monitor": {
+      "get": {
+        "tags": ["sync"],
+        "description": "获取同步任务的监控数据",
+        "operationId": "getSyncMonitor",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "同步任务的ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功获取监控数据",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncMonitorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "错误响应",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sync/{id}/metrics": {
+      "get": {
+        "tags": ["sync"],
+        "description": "获取同步任务的指标数据",
+        "operationId": "getSyncMetrics",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "同步任务的ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "range",
+            "in": "query",
+            "description": "时间范围（例如：1h, 3h, 6h, 12h, 1d, 2d, 7d, custom）",
+            "schema": {
+              "type": "string",
+              "enum": ["1h", "3h", "6h", "12h", "1d", "2d", "7d", "custom"]
+            }
+          },
+          {
+            "name": "startTime",
+            "in": "query",
+            "description": "自定义时间范围的开始时间（ISO 8601格式）",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "endTime",
+            "in": "query",
+            "description": "自定义时间范围的结束时间（ISO 8601格式）",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功获取指标数据",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncMetricsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "错误响应",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sync/{id}/logs": {
+      "get": {
+        "tags": ["sync"],
+        "description": "获取同步任务的日志",
+        "operationId": "getSyncLogs",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "同步任务的ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "level",
+            "in": "query",
+            "description": "日志级别（INFO, WARN, ERROR）",
+            "schema": {
+              "type": "string",
+              "enum": ["INFO", "WARN", "ERROR"]
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "description": "搜索关键词",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功获取日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncLogsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "错误响应",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sync/{id}": {
+      "put": {
+        "tags": ["sync"],
+        "description": "更新同步任务",
+        "operationId": "updateSyncTask",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "同步任务的ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "更新同步任务的参数",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSyncTask"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "成功更新同步任务",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateSyncTaskResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "错误响应",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["sync"],
+        "description": "删除同步任务",
+        "operationId": "deleteSyncTask",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "同步任务的ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功删除同步任务",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteSyncTaskResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "错误响应",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -302,160 +699,80 @@
       "CurrentUser": {
         "type": "object",
         "properties": {
-          "name": {
-            "type": "string"
-          },
-          "avatar": {
-            "type": "string"
-          },
-          "userid": {
-            "type": "string"
-          },
-          "email": {
-            "type": "string"
-          },
-          "signature": {
-            "type": "string"
-          },
-          "title": {
-            "type": "string"
-          },
-          "group": {
-            "type": "string"
-          },
+          "name": { "type": "string" },
+          "avatar": { "type": "string" },
+          "userid": { "type": "string" },
+          "email": { "type": "string" },
+          "signature": { "type": "string" },
+          "title": { "type": "string" },
+          "group": { "type": "string" },
           "tags": {
             "type": "array",
             "items": {
               "type": "object",
               "properties": {
-                "key": {
-                  "type": "string"
-                },
-                "label": {
-                  "type": "string"
-                }
+                "key": { "type": "string" },
+                "label": { "type": "string" }
               }
             }
           },
-          "notifyCount": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "unreadCount": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "country": {
-            "type": "string"
-          },
-          "access": {
-            "type": "string"
-          },
+          "notifyCount": { "type": "integer", "format": "int32" },
+          "unreadCount": { "type": "integer", "format": "int32" },
+          "country": { "type": "string" },
+          "access": { "type": "string" },
           "geographic": {
             "type": "object",
             "properties": {
               "province": {
                 "type": "object",
                 "properties": {
-                  "label": {
-                    "type": "string"
-                  },
-                  "key": {
-                    "type": "string"
-                  }
+                  "label": { "type": "string" },
+                  "key": { "type": "string" }
                 }
               },
               "city": {
                 "type": "object",
                 "properties": {
-                  "label": {
-                    "type": "string"
-                  },
-                  "key": {
-                    "type": "string"
-                  }
+                  "label": { "type": "string" },
+                  "key": { "type": "string" }
                 }
               }
             }
           },
-          "address": {
-            "type": "string"
-          },
-          "phone": {
-            "type": "string"
-          }
+          "address": { "type": "string" },
+          "phone": { "type": "string" }
         }
       },
       "LoginResult": {
         "type": "object",
         "properties": {
-          "status": {
-            "type": "string"
-          },
-          "type": {
-            "type": "string"
-          },
-          "currentAuthority": {
-            "type": "string"
-          }
+          "status": { "type": "string" },
+          "type": { "type": "string" },
+          "currentAuthority": { "type": "string" }
         }
       },
       "PageParams": {
         "type": "object",
         "properties": {
-          "current": {
-            "type": "number"
-          },
-          "pageSize": {
-            "type": "number"
-          }
+          "current": { "type": "number" },
+          "pageSize": { "type": "number" }
         }
       },
       "RuleListItem": {
         "type": "object",
         "properties": {
-          "key": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "disabled": {
-            "type": "boolean"
-          },
-          "href": {
-            "type": "string"
-          },
-          "avatar": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          },
-          "owner": {
-            "type": "string"
-          },
-          "desc": {
-            "type": "string"
-          },
-          "callNo": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "status": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "updatedAt": {
-            "type": "string",
-            "format": "datetime"
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "datetime"
-          },
-          "progress": {
-            "type": "integer",
-            "format": "int32"
-          }
+          "key": { "type": "integer", "format": "int32" },
+          "disabled": { "type": "boolean" },
+          "href": { "type": "string" },
+          "avatar": { "type": "string" },
+          "name": { "type": "string" },
+          "owner": { "type": "string" },
+          "desc": { "type": "string" },
+          "callNo": { "type": "integer", "format": "int32" },
+          "status": { "type": "integer", "format": "int32" },
+          "updatedAt": { "type": "string", "format": "datetime" },
+          "createdAt": { "type": "string", "format": "datetime" },
+          "progress": { "type": "integer", "format": "int32" }
         }
       },
       "RuleList": {
@@ -463,47 +780,30 @@
         "properties": {
           "data": {
             "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/RuleListItem"
-            }
+            "items": { "$ref": "#/components/schemas/RuleListItem" }
           },
           "total": {
             "type": "integer",
             "description": "列表的内容总数",
             "format": "int32"
           },
-          "success": {
-            "type": "boolean"
-          }
+          "success": { "type": "boolean" }
         }
       },
       "FakeCaptcha": {
         "type": "object",
         "properties": {
-          "code": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "status": {
-            "type": "string"
-          }
+          "code": { "type": "integer", "format": "int32" },
+          "status": { "type": "string" }
         }
       },
       "LoginParams": {
         "type": "object",
         "properties": {
-          "username": {
-            "type": "string"
-          },
-          "password": {
-            "type": "string"
-          },
-          "autoLogin": {
-            "type": "boolean"
-          },
-          "type": {
-            "type": "string"
-          }
+          "username": { "type": "string" },
+          "password": { "type": "string" },
+          "autoLogin": { "type": "boolean" },
+          "type": { "type": "string" }
         }
       },
       "ErrorResponse": {
@@ -529,62 +829,228 @@
         "properties": {
           "data": {
             "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/NoticeIconItem"
-            }
+            "items": { "$ref": "#/components/schemas/NoticeIconItem" }
           },
           "total": {
             "type": "integer",
             "description": "列表的内容总数",
             "format": "int32"
           },
-          "success": {
-            "type": "boolean"
-          }
+          "success": { "type": "boolean" }
         }
       },
       "NoticeIconItemType": {
         "title": "NoticeIconItemType",
         "description": "已读未读列表的枚举",
         "type": "string",
-        "properties": {},
         "enum": ["notification", "message", "event"]
       },
       "NoticeIconItem": {
         "type": "object",
         "properties": {
-          "id": {
-            "type": "string"
-          },
-          "extra": {
-            "type": "string",
-            "format": "any"
-          },
+          "id": { "type": "string" },
+          "extra": { "type": "string", "format": "any" },
           "key": { "type": "string" },
-          "read": {
-            "type": "boolean"
-          },
-          "avatar": {
-            "type": "string"
-          },
-          "title": {
-            "type": "string"
-          },
-          "status": {
-            "type": "string"
-          },
-          "datetime": {
-            "type": "string",
-            "format": "date"
-          },
-          "description": {
-            "type": "string"
-          },
+          "read": { "type": "boolean" },
+          "avatar": { "type": "string" },
+          "title": { "type": "string" },
+          "status": { "type": "string" },
+          "datetime": { "type": "string", "format": "date" },
+          "description": { "type": "string" },
           "type": {
-            "extensions": {
-              "x-is-enum": true
-            },
-            "$ref": "#/components/schemas/NoticeIconItemType"
+            "type": "string",
+            "enum": ["notification", "message", "event"]
+          }
+        }
+      },
+      "Task": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer", "format": "int32" },
+          "taskName": { "type": "string" },
+          "sourceType": { "type": "string" },
+          "source": { "type": "string" },
+          "target": { "type": "string" },
+          "status": { "type": "string" },
+          "lastUpdateTime": { "type": "string", "format": "datetime" },
+          "lastRunTime": { "type": "string", "format": "datetime" },
+          "sourceConn": {
+            "$ref": "#/components/schemas/Connection"
+          },
+          "targetConn": {
+            "$ref": "#/components/schemas/Connection"
+          },
+          "mappings": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/Mapping" }
+          }
+        }
+      },
+      "Connection": {
+        "type": "object",
+        "properties": {
+          "host": { "type": "string" },
+          "port": { "type": "string" },
+          "user": { "type": "string" },
+          "password": { "type": "string" },
+          "database": { "type": "string" }
+        }
+      },
+      "Mapping": {
+        "type": "object",
+        "properties": {
+          "sourceTable": { "type": "string" },
+          "targetTable": { "type": "string" }
+        }
+      },
+      "SyncListResponse": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean" },
+          "data": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/Task" }
+          }
+        }
+      },
+      "CreateSyncTask": {
+        "type": "object",
+        "properties": {
+          "taskName": { "type": "string" },
+          "sourceType": { "type": "string" },
+          "sourceConn": { "$ref": "#/components/schemas/Connection" },
+          "targetConn": { "$ref": "#/components/schemas/Connection" },
+          "mappings": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/Mapping" }
+          }
+        },
+        "required": ["taskName", "sourceType", "sourceConn", "targetConn", "mappings"]
+      },
+      "CreateSyncTaskResponse": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "msg": { "type": "string" },
+              "formData": { "$ref": "#/components/schemas/Task" }
+            }
+          }
+        }
+      },
+      "StartSyncResponse": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "msg": { "type": "string" }
+            }
+          }
+        }
+      },
+      "StopSyncResponse": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "msg": { "type": "string" }
+            }
+          }
+        }
+      },
+      "SyncMonitorResponse": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "progress": { "type": "number" },
+              "tps": { "type": "number" },
+              "delay": { "type": "number" },
+              "status": { "type": "string" }
+            }
+          }
+        }
+      },
+      "SyncMetricsResponse": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "rowCountTrend": {
+                "type": "array",
+                "items": { "$ref": "#/components/schemas/ChartPoint" }
+              },
+              "syncEventStats": {
+                "type": "array",
+                "items": { "$ref": "#/components/schemas/ChartPoint" }
+              }
+            }
+          }
+        }
+      },
+      "ChartPoint": {
+        "type": "object",
+        "properties": {
+          "time": { "type": "string" },
+          "value": { "type": "number" },
+          "type": { "type": "string" }
+        }
+      },
+      "SyncLogsResponse": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean" },
+          "data": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/LogItem" }
+          }
+        }
+      },
+      "UpdateSyncTask": {
+        "type": "object",
+        "properties": {
+          "taskName": { "type": "string" },
+          "sourceType": { "type": "string" },
+          "sourceConn": { "$ref": "#/components/schemas/Connection" },
+          "targetConn": { "$ref": "#/components/schemas/Connection" },
+          "mappings": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/Mapping" }
+          }
+        }
+      },
+      "UpdateSyncTaskResponse": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "msg": { "type": "string" },
+              "formData": { "$ref": "#/components/schemas/Task" }
+            }
+          }
+        }
+      },
+      "DeleteSyncTaskResponse": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "msg": { "type": "string" }
+            }
           }
         }
       }

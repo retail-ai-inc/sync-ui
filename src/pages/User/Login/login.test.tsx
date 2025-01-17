@@ -40,14 +40,14 @@ describe('Login Page', () => {
       />,
     );
 
-    await rootContainer.findAllByText('Ant Design');
+    await rootContainer.findAllByText('Sync Data Platform');
 
     act(() => {
       historyRef.current?.push('/user/login');
     });
 
     expect(rootContainer.baseElement?.querySelector('.ant-pro-form-login-desc')?.textContent).toBe(
-      'Ant Design is the most influential web design specification in Xihu district',
+      'Sync Data Platform',
     );
 
     expect(rootContainer.asFragment()).toMatchSnapshot();
@@ -66,7 +66,7 @@ describe('Login Page', () => {
       />,
     );
 
-    await rootContainer.findAllByText('Ant Design');
+    await rootContainer.findAllByText('Sync Data Platform');
 
     const userNameInput = await rootContainer.findByPlaceholderText('Username: admin or user');
 
@@ -74,10 +74,10 @@ describe('Login Page', () => {
       fireEvent.change(userNameInput, { target: { value: 'admin' } });
     });
 
-    const passwordInput = await rootContainer.findByPlaceholderText('Password: ant.design');
+    const passwordInput = await rootContainer.findByPlaceholderText('Password: admin');
 
     act(() => {
-      fireEvent.change(passwordInput, { target: { value: 'ant.design' } });
+      fireEvent.change(passwordInput, { target: { value: 'admin' } });
     });
 
     await (await rootContainer.findByText('Login')).click();
@@ -85,7 +85,7 @@ describe('Login Page', () => {
     // 等待接口返回结果
     await waitTime(5000);
 
-    await rootContainer.findAllByText('Ant Design Pro');
+    await rootContainer.findAllByText('Sync Data Platform');
 
     expect(rootContainer.asFragment()).toMatchSnapshot();
 

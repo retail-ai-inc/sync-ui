@@ -23,37 +23,20 @@ export default [
     ],
   },
   {
-    path: '/welcome',
-    name: 'welcome',
-    icon: 'smile',
-    component: './Welcome',
-  },
-  {
-    path: '/admin',
-    name: 'admin',
-    icon: 'crown',
-    access: 'canAdmin',
-    routes: [
-      {
-        path: '/admin',
-        redirect: '/admin/sub-page',
-      },
-      {
-        path: '/admin/sub-page',
-        name: 'sub-page',
-        component: './Admin',
-      },
-    ],
-  },
-  {
-    name: 'list.table-list',
+    name: 'Data Sync Tasks',
     icon: 'table',
-    path: '/list',
-    component: './TableList',
+    path: '/dataSync',
+    component: './DataSync',
+  },
+  {
+    path: '/dataSync/monitor',
+    name: '数据同步监控',
+    component: './DataSync/MonitorPage',
+    hideInMenu: true, // 不在菜单中显示
   },
   {
     path: '/',
-    redirect: '/welcome',
+    redirect: '/dataSync',
   },
   {
     path: '*',

@@ -1,6 +1,6 @@
 /**
- * MonitorPage.tsx
- * src/pages/DataSync/MonitorPage.tsx
+ * Monitor.tsx
+ * src/pages/Sync/Monitor.tsx
  */
 import React, { useEffect, useState } from 'react';
 import {
@@ -58,7 +58,7 @@ interface MonitorData {
   status: string;
 }
 
-const MonitorPage: React.FC = () => {
+const Monitor: React.FC = () => {
   const [monitorData, setMonitorData] = useState<MonitorData>({
     progress: 0,
     tps: 0,
@@ -311,7 +311,7 @@ const MonitorPage: React.FC = () => {
             checked={autoRefresh}
             onChange={(checked) => setAutoRefresh(checked)}
           />
-          <Button onClick={() => navigate('/dataSync')}>Back to list</Button>
+          <Button onClick={() => navigate('/Sync')}>Back to list</Button>
         </Space>
       }
     >
@@ -429,4 +429,4 @@ const MonitorPage: React.FC = () => {
   );
 };
 
-export default MonitorPage;
+export default Monitor;

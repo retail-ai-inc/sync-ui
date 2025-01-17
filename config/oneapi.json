@@ -43,39 +43,11 @@
       },
       "x-swagger-router-controller": "api"
     },
-    "/api/login/captcha": {
-      "post": {
-        "description": "发送验证码",
-        "operationId": "getFakeCaptcha",
-        "tags": ["login"],
-        "parameters": [
-          {
-            "name": "phone",
-            "in": "query",
-            "description": "手机号",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/FakeCaptcha"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/login/outLogin": {
+
+    "/api/logout": {
       "post": {
         "description": "退出登录接口",
-        "operationId": "outLogin",
+        "operationId": "logout",
         "tags": ["login"],
         "responses": {
           "200": {

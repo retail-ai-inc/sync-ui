@@ -25,18 +25,18 @@ export default [
   {
     name: 'Data Sync Tasks',
     icon: 'table',
-    path: '/dataSync',
-    component: './DataSync',
+    path: '/Sync',
+    component: './Sync',
   },
   {
-    path: '/dataSync/monitor',
+    path: '/Sync/monitor',
     name: '数据同步监控',
-    component: './DataSync/MonitorPage',
+    component: './Sync/Monitor',
     hideInMenu: true, // 不在菜单中显示
   },
   {
     path: '/',
-    redirect: '/dataSync',
+    redirect: '/Sync',
   },
   {
     path: '*',

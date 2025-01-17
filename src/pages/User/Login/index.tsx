@@ -1,5 +1,5 @@
 import { Footer } from '@/components';
-import { login } from '@/services/ant-design-pro/api';
+import { login } from '@/services/ant-design-pro/user';
 import { UserOutlined, LockOutlined } from '@ant-design/icons';
 import { LoginForm, ProFormCheckbox, ProFormText } from '@ant-design/pro-components';
 import { FormattedMessage, Helmet, history, SelectLang, useIntl, useModel } from '@umijs/max';
@@ -95,7 +95,6 @@ const Login: React.FC = () => {
       if (msg.status === 'ok') {
         const defaultLoginSuccessMessage = intl.formatMessage({
           id: 'pages.login.success',
-          defaultMessage: '登录成功！',
         });
         message.success(defaultLoginSuccessMessage);
         await fetchUserInfo();
@@ -109,7 +108,6 @@ const Login: React.FC = () => {
     } catch (error) {
       const defaultLoginFailureMessage = intl.formatMessage({
         id: 'pages.login.failure',
-        defaultMessage: '登录失败，请重试！',
       });
       console.log(error);
       message.error(defaultLoginFailureMessage);
@@ -123,7 +121,6 @@ const Login: React.FC = () => {
         <title>
           {intl.formatMessage({
             id: 'menu.login',
-            defaultMessage: '登录页',
           })}
           {Settings.title && ` - ${Settings.title}`}
         </title>
@@ -154,7 +151,6 @@ const Login: React.FC = () => {
             <LoginMessage
               content={intl.formatMessage({
                 id: 'pages.login.accountLogin.errorMessage',
-                defaultMessage: '账户或密码错误(admin/admin)',
               })}
             />
           )}
@@ -166,17 +162,11 @@ const Login: React.FC = () => {
             }}
             placeholder={intl.formatMessage({
               id: 'pages.login.username.placeholder',
-              defaultMessage: '用户名: admin or user',
             })}
             rules={[
               {
                 required: true,
-                message: (
-                  <FormattedMessage
-                    id="pages.login.username.required"
-                    defaultMessage="请输入用户名!"
-                  />
-                ),
+                message: <FormattedMessage id="pages.login.username.required" />,
               },
             ]}
           />
@@ -188,17 +178,11 @@ const Login: React.FC = () => {
             }}
             placeholder={intl.formatMessage({
               id: 'pages.login.password.placeholder',
-              defaultMessage: '密码: admin',
             })}
             rules={[
               {
                 required: true,
-                message: (
-                  <FormattedMessage
-                    id="pages.login.password.required"
-                    defaultMessage="请输入密码！"
-                  />
-                ),
+                message: <FormattedMessage id="pages.login.password.required" />,
               },
             ]}
           />
@@ -208,7 +192,7 @@ const Login: React.FC = () => {
             }}
           >
             <ProFormCheckbox noStyle name="autoLogin">
-              <FormattedMessage id="pages.login.rememberMe" defaultMessage="自动登录" />
+              <FormattedMessage id="pages.login.rememberMe" />
             </ProFormCheckbox>
             <a
               style={{

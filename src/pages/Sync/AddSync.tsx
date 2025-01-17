@@ -1,4 +1,4 @@
-// src/pages/DataSync/AddSyncForm.tsx
+// src/pages/Sync/AddSync.tsx
 
 import React, { useState, useEffect } from 'react';
 import { StepsForm, ProFormText, ProFormSelect } from '@ant-design/pro-components';
@@ -28,7 +28,7 @@ interface SyncRecord {
   mappings?: MappingItem[];
 }
 
-interface AddSyncFormProps {
+interface AddSyncProps {
   record?: SyncRecord;
   onSuccess: () => void;
   onCancel: () => void;
@@ -42,7 +42,7 @@ const mockData = [
   { key: 'logs', title: 'logs', description: 'table logs' },
 ];
 
-const AddSyncForm: React.FC<AddSyncFormProps> = ({ record, onSuccess, onCancel }) => {
+const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
   const [targetKeys, setTargetKeys] = useState<TransferProps['targetKeys']>([]);
   const [selectedKeys, setSelectedKeys] = useState<TransferProps['selectedKeys']>([]);
 
@@ -239,4 +239,4 @@ const AddSyncForm: React.FC<AddSyncFormProps> = ({ record, onSuccess, onCancel }
   );
 };
 
-export default AddSyncForm;
+export default AddSync;

@@ -1,4 +1,4 @@
-// src/pages/DataSync/DataSyncList.tsx
+// src/pages/Sync/SyncList.tsx
 
 import React, { useEffect, useState } from 'react';
 import {
@@ -15,7 +15,7 @@ import {
   Checkbox,
 } from 'antd';
 import { PlusOutlined, RedoOutlined, SettingOutlined } from '@ant-design/icons';
-import AddSyncForm from './AddSyncForm';
+import AddSync from './AddSync';
 import { fetchSyncList, startSync, stopSync, deleteSyncTask } from '@/services/ant-design-pro/sync';
 import { useNavigate } from '@umijs/max';
 
@@ -55,7 +55,7 @@ const statusColorMap: Record<string, string> = {
   Error: 'red',
 };
 
-const DataSyncList: React.FC = () => {
+const SyncList: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [syncList, setSyncList] = useState<SyncItem[]>([]);
   const [addModalOpen, setAddModalOpen] = useState(false);
@@ -226,7 +226,7 @@ const DataSyncList: React.FC = () => {
               Start
             </Button>
           )}
-          <Button onClick={() => navigate(`/dataSync/monitor?taskId=${record.id}`)}>Monitor</Button>
+          <Button onClick={() => navigate(`/Sync/monitor?taskId=${record.id}`)}>Monitor</Button>
           <Button onClick={() => handleEdit(record)}>Edit</Button>
           <Button danger onClick={() => handleDelete(record)}>
             Delete
@@ -317,7 +317,7 @@ const DataSyncList: React.FC = () => {
         destroyOnClose
         width={800}
       >
-        <AddSyncForm
+        <AddSync
           record={editingRecord || undefined}
           onSuccess={() => {
             setAddModalOpen(false);
@@ -334,4 +334,4 @@ const DataSyncList: React.FC = () => {
   );
 };
 
-export default DataSyncList;
+export default SyncList;

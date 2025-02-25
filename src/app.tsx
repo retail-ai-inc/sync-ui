@@ -31,9 +31,9 @@ export async function getInitialState(): Promise<{
     }
     return undefined;
   };
-  // 如果不是登录页面，执行
+  // 如果不是登录页面或Google回调页面，才执行获取用户信息
   const { location } = history;
-  if (location.pathname !== loginPath) {
+  if (location.pathname !== loginPath && !location.pathname.startsWith('/auth/google/callback')) {
     const currentUser = await fetchUserInfo();
     return {
       fetchUserInfo,
@@ -61,8 +61,12 @@ export const layout: RunTimeLayoutConfig = ({ initialState, setInitialState }) =
     footerRender: () => <Footer />,
     onPageChange: () => {
       const { location } = history;
-      // 如果没有登录，重定向到 login
-      if (!initialState?.currentUser && location.pathname !== loginPath) {
+      // 如果没有登录，且不在登录页或回调页，则重定向到 login
+      if (
+        !initialState?.currentUser &&
+        location.pathname !== loginPath &&
+        !location.pathname.startsWith('/auth/google/callback')
+      ) {
         history.push(loginPath);
       }
     },

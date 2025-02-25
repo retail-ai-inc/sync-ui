@@ -1,9 +1,9 @@
 import { Footer } from '@/components';
 import { login } from '@/services/ant-design-pro/user';
-import { UserOutlined, LockOutlined } from '@ant-design/icons';
+import { UserOutlined, LockOutlined, GoogleOutlined } from '@ant-design/icons';
 import { LoginForm, ProFormCheckbox, ProFormText } from '@ant-design/pro-components';
 import { FormattedMessage, Helmet, history, SelectLang, useIntl, useModel } from '@umijs/max';
-import { Alert, message } from 'antd';
+import { Alert, message, Button } from 'antd';
 import { createStyles } from 'antd-style';
 import React, { useState } from 'react';
 import { flushSync } from 'react-dom';
@@ -113,6 +113,22 @@ const Login: React.FC = () => {
       message.error(defaultLoginFailureMessage);
     }
   };
+
+  const handleGoogleLogin = () => {
+    // 动态获取当前主机和端口
+    const currentHost = window.location.origin;
+    const redirectUri = `${currentHost}/auth/google/callback`;
+
+    // Google OAuth 客户端ID应该根据环境配置
+    const clientId = '495370126123-jk59og3bur7uuqgsct21bvgsb9maeb9q.apps.googleusercontent.com';
+
+    // 构建授权URL
+    const googleAuthUrl = `https://accounts.google.com/o/oauth2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=email profile&response_type=code`;
+
+    console.log('重定向到Google授权页面，回调URL:', redirectUri);
+    window.location.href = googleAuthUrl;
+  };
+
   const { status } = userLoginState;
 
   return (
@@ -199,6 +215,16 @@ const Login: React.FC = () => {
                 float: 'right',
               }}
             ></a>
+          </div>
+
+          <div style={{ marginBottom: 24, textAlign: 'center' }}>
+            <Button
+              icon={<GoogleOutlined />}
+              style={{ width: '100%', marginTop: 16 }}
+              onClick={handleGoogleLogin}
+            >
+              Login with Google
+            </Button>
           </div>
         </LoginForm>
       </div>

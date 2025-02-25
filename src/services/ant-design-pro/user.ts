@@ -31,3 +31,15 @@ export async function login(body: API.LoginParams, options?: { [key: string]: an
     ...(options || {}),
   });
 }
+
+/** Google OAuth 登录回调处理 */
+export async function handleGoogleCallback(code: string, options?: { [key: string]: any }) {
+  return request<API.LoginResult>('/api/login/google/callback', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: { code },
+    ...(options || {}),
+  });
+}

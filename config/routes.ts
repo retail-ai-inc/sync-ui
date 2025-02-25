@@ -39,6 +39,11 @@ export default [
     redirect: '/Sync',
   },
   {
+    path: '/auth/google/callback',
+    component: './User/GoogleCallback',
+    layout: false,
+  },
+  {
     path: '*',
     layout: false,
     component: './404',

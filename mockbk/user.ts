@@ -71,4 +71,25 @@ export default {
     access = '';
     res.send({ data: {}, success: true });
   },
+  'POST /api/login/google/callback': async (req: Request, res: Response) => {
+    const { code } = req.body;
+
+    if (code) {
+      console.log('Mock处理Google回调，授权码:', code.substring(0, 10) + '...');
+      res.send({
+        status: 'ok',
+        type: 'google',
+        currentAuthority: 'admin',
+      });
+      access = 'admin';
+      return;
+    }
+
+    res.send({
+      status: 'error',
+      type: 'google',
+      currentAuthority: 'guest',
+    });
+    access = 'guest';
+  },
 };

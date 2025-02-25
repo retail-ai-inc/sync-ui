@@ -6,10 +6,8 @@ import React, { useEffect, useState } from 'react';
 import {
   Card,
   Button,
-  Progress,
   Row,
   Col,
-  Statistic,
   message,
   Table,
   Tag,
@@ -29,7 +27,7 @@ import {
   startSync,
   stopSync,
 } from '@/services/ant-design-pro/sync';
-import { Line } from '@ant-design/plots'; // changed to a single Line chart for rowCountTrend
+import { Line } from '@ant-design/plots';
 
 const { RangePicker } = DatePicker;
 const { Option } = Select;
@@ -43,7 +41,8 @@ interface LogItem {
 interface ChartPoint {
   time: string;
   value: number;
-  type: string; // 'source', 'target', 'diff', or 'insert', 'delete', 'update'
+  type: string; // 'source', 'target', 'diff', etc.
+  table?: string; // 后端返回的字段
 }
 
 interface MetricsData {
@@ -96,6 +95,32 @@ const Monitor: React.FC = () => {
   const navigate = useNavigate();
   const taskId = searchParams.get('taskId');
 
+  // ========== Reusable "loadMetrics" with parameters ==========
+  const loadMetricsImpl = async (rangeParam?: string, startTime?: string, endTime?: string) => {
+    if (!taskId) return;
+    try {
+      const res = await fetchSyncMetrics(Number(taskId), {
+        range: rangeParam,
+        startTime,
+        endTime,
+      });
+      if (res.success && res.data) {
+        const safeRowCountTrend = Array.isArray(res.data.rowCountTrend)
+          ? res.data.rowCountTrend
+          : [];
+        const safeSyncEventStats = Array.isArray(res.data.syncEventStats)
+          ? res.data.syncEventStats
+          : [];
+        setMetrics({
+          rowCountTrend: safeRowCountTrend,
+          syncEventStats: safeSyncEventStats,
+        });
+      }
+    } catch {
+      message.error('Failed to load metrics data');
+    }
+  };
+
   // ========== API Calls ==========
   const loadMonitor = async () => {
     if (!taskId) return;
@@ -111,18 +136,12 @@ const Monitor: React.FC = () => {
   };
 
   const loadMetrics = async () => {
-    if (!taskId) return;
-    try {
-      const res = await fetchSyncMetrics(Number(taskId), {
-        range: timeRange,
-        startTime: customTimeRange?.[0]?.toISOString(),
-        endTime: customTimeRange?.[1]?.toISOString(),
-      });
-      if (res.success) {
-        setMetrics(res.data);
-      }
-    } catch {
-      message.error('Failed to load metrics data');
+    if (timeRange !== 'custom') {
+      loadMetricsImpl(timeRange);
+    } else {
+      const startStr = customTimeRange?.[0]?.toISOString();
+      const endStr = customTimeRange?.[1]?.toISOString();
+      loadMetricsImpl(timeRange, startStr, endStr);
     }
   };
 
@@ -176,12 +195,10 @@ const Monitor: React.FC = () => {
   // ========== Effects ==========
   useEffect(() => {
     loadMonitor();
-    loadMetrics();
+    loadMetricsImpl('1h');
     loadLogs();
-    // eslint-disable-next-line
   }, []);
 
-  // Auto refresh everything
   useEffect(() => {
     let timer: NodeJS.Timeout | undefined;
     if (autoRefresh) {
@@ -194,42 +211,49 @@ const Monitor: React.FC = () => {
     return () => {
       if (timer) clearInterval(timer);
     };
-    // eslint-disable-next-line
   }, [autoRefresh, timeRange, customTimeRange, logLevel, logSearch]);
 
   // ========== Handlers ==========
   const handleTimeRangeChange = (e: any) => {
-    setTimeRange(e.target.value);
+    const newRange = e.target.value;
+    setTimeRange(newRange);
     setCustomTimeRange(undefined);
+    if (newRange !== 'custom') {
+      loadMetricsImpl(newRange);
+    }
   };
 
   const handleCustomTimeChange = (dates: any) => {
     setCustomTimeRange(dates);
+    if (dates && dates.length === 2) {
+      loadMetricsImpl('custom', dates[0].toISOString(), dates[1].toISOString());
+    }
   };
 
-  const handleMetricsRefresh = () => {
-    loadMetrics();
-  };
-
-  // Logs
   const handleLogsRefresh = () => {
     loadLogs();
   };
 
-  // When user changes log level => automatically fetch logs
   const handleChangeLogLevel = (val: string) => {
     setLogLevel(val);
     loadLogs();
   };
 
   // ========== Logs Table ==========
+  const levelColorMap: Record<string, string> = {
+    ERROR: 'red',
+    WARN: 'orange',
+    INFO: 'blue',
+    DEBUG: 'green',
+  };
+
   const columns = [
     {
       title: 'Level',
       dataIndex: 'level',
       key: 'level',
       render: (level: string) => {
-        const color = level === 'ERROR' ? 'red' : level === 'WARN' ? 'orange' : 'blue';
+        const color = levelColorMap[level.toUpperCase()] || 'blue';
         return <Tag color={color}>{level}</Tag>;
       },
       width: 100,
@@ -248,32 +272,62 @@ const Monitor: React.FC = () => {
   ];
 
   // ========== Chart Config: Table Row Count Trend (Line) ==========
-  // Filter data based on checkboxes (source, target, diff).
-  const rowCountFiltered = metrics.rowCountTrend.filter(
-    (p) =>
-      (p.type === 'source' && showSource) ||
-      (p.type === 'target' && showTarget) ||
-      (p.type === 'diff' && showDiff),
-  );
+  // 根据复选框过滤 'source','target','diff'
+  const rowCountFilteredRaw = (metrics.rowCountTrend || []).filter((p) => {
+    if (p.type === 'source' && !showSource) return false;
+    if (p.type === 'target' && !showTarget) return false;
+    if (p.type === 'diff' && !showDiff) return false;
+    return true;
+  });
 
+  // 创建一个颜色映射
+  const colorMap = {};
+  // const colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']; // 颜色数组
+
+  const rowCountFiltered = rowCountFilteredRaw.map((p) => {
+    // 如果当前表没有颜色映射，则分配一个新颜色
+    if (!colorMap[p.table]) {
+      colorMap[p.table] = p.table; // 循环使用颜色
+      // colorIndex++; // 删除或注释掉未使用的递增语句
+    }
+    return {
+      ...p,
+      tableType: p.table ? `${p.table}-${p.type}` : p.type,
+      color: colorMap[p.table], // 为每个表分配颜色
+    };
+  });
+
+  // 动态计算不同表的 source、target 和 diff 三条线
   const rowCountTrendConfig = {
     data: rowCountFiltered,
     xField: 'time',
     yField: 'value',
-    seriesField: 'type',
+    seriesField: 'tableType',
+    colorField: 'color',
     smooth: true,
-    legend: { position: 'top' },
-    slider: {},
+    legend: {
+      position: 'top',
+    },
+    slider: {
+      start: 0.1, // Set the initial zoom range for the slider (10% of the data)
+      end: 0.9, // Set the initial end of the zoom range (90% of the data)
+      x: {
+        labelFormatter: (d) => new Date(d).toLocaleDateString(), // Format the x-axis date values
+      },
+      y: {
+        labelFormatter: '~s', // Format Y-axis labels with shorthand notation
+      },
+    },
+    height: 300,
   };
 
   // ========== Chart Config: Sync Event Statistics (Line) ==========
-  // Filter data based on checkboxes (insert, delete, update).
-  const eventStatsFiltered = metrics.syncEventStats.filter(
-    (p) =>
-      (p.type === 'insert' && showInsert) ||
-      (p.type === 'delete' && showDelete) ||
-      (p.type === 'update' && showUpdate),
-  );
+  const eventStatsFiltered = (metrics.syncEventStats || []).filter((p) => {
+    if (p.type === 'insert' && !showInsert) return false;
+    if (p.type === 'delete' && !showDelete) return false;
+    if (p.type === 'update' && !showUpdate) return false;
+    return true;
+  });
 
   const syncEventStatsConfig = {
     data: eventStatsFiltered,
@@ -282,8 +336,12 @@ const Monitor: React.FC = () => {
     seriesField: 'type',
     autoFit: true,
     smooth: true,
-    slider: {},
+    slider: {
+      start: 0.1,
+      end: 0.9,
+    },
     legend: { position: 'top' },
+    height: 200,
   };
 
   // ========== Return JSX ==========
@@ -292,7 +350,6 @@ const Monitor: React.FC = () => {
       title={
         <Space>
           <span>{`Current Monitoring Task (ID: ${taskId || 'N/A'})`}</span>
-          {/* Show current status */}
           <Tag color={monitorData.status === 'Running' ? 'green' : 'orange'}>
             {monitorData.status}
           </Tag>
@@ -304,7 +361,6 @@ const Monitor: React.FC = () => {
           <Button onClick={handleResume} type="primary">
             Resume
           </Button>
-          {/* Global auto refresh */}
           <Switch
             checkedChildren="Auto Refresh"
             unCheckedChildren="Auto Refresh"
@@ -315,26 +371,7 @@ const Monitor: React.FC = () => {
         </Space>
       }
     >
-      <Row gutter={[16, 16]}>
-        <Col span={8}>
-          <Card>
-            <p>Current Progress</p>
-            <Progress percent={monitorData.progress} />
-          </Card>
-        </Col>
-        <Col span={8}>
-          <Card>
-            <Statistic title="TPS" value={monitorData.tps} suffix="/s" />
-          </Card>
-        </Col>
-        <Col span={8}>
-          <Card>
-            <Statistic title="Delay" value={monitorData.delay} suffix="s" precision={2} />
-          </Card>
-        </Col>
-      </Row>
-
-      {/* Time range selection & refresh for charts */}
+      {/* Time range selection */}
       <Card style={{ marginTop: 16 }}>
         <Row gutter={16} align="middle" style={{ marginBottom: 16 }}>
           <Col>
@@ -354,14 +391,9 @@ const Monitor: React.FC = () => {
               <RangePicker onChange={handleCustomTimeChange} showTime />
             </Col>
           )}
-          <Col>
-            <Button type="primary" onClick={handleMetricsRefresh}>
-              Refresh Charts
-            </Button>
-          </Col>
         </Row>
 
-        {/* (1) Table Row Count Trend as line chart */}
+        {/* Table Row Count Trend */}
         <Card title="Table Row Count Trend" style={{ marginBottom: 16 }}>
           <Space style={{ marginBottom: 16 }}>
             <Checkbox checked={showSource} onChange={(e) => setShowSource(e.target.checked)}>
@@ -377,7 +409,7 @@ const Monitor: React.FC = () => {
           <Line {...rowCountTrendConfig} />
         </Card>
 
-        {/* (2) Sync Event Statistics as line chart */}
+        {/* Sync Event Statistics */}
         <Card title="Sync Event Statistics">
           <Space style={{ marginBottom: 16 }}>
             <Checkbox checked={showInsert} onChange={(e) => setShowInsert(e.target.checked)}>
@@ -397,7 +429,6 @@ const Monitor: React.FC = () => {
       {/* Logs Table */}
       <Card title="Error / Warning / Log List" style={{ marginTop: 16 }}>
         <Space style={{ marginBottom: 16 }}>
-          {/* auto query onChange */}
           <Select
             placeholder="Select level"
             style={{ width: 120 }}
@@ -408,6 +439,7 @@ const Monitor: React.FC = () => {
             <Option value="INFO">INFO</Option>
             <Option value="WARN">WARN</Option>
             <Option value="ERROR">ERROR</Option>
+            <Option value="DEBUG">DEBUG</Option>
           </Select>
           <Input
             placeholder="Search logs"
@@ -415,14 +447,17 @@ const Monitor: React.FC = () => {
             onChange={(e) => setLogSearch(e.target.value)}
             style={{ width: 200 }}
           />
-          {/* Keep a "Refresh" button for convenience */}
           <Button onClick={handleLogsRefresh}>Refresh</Button>
         </Space>
         <Table<LogItem>
           columns={columns}
           dataSource={logs}
           rowKey={(record) => record.time + record.message}
-          pagination={{ pageSize: 5 }}
+          pagination={{
+            defaultPageSize: 20,
+            showSizeChanger: true,
+            pageSizeOptions: ['20', '50', '100', '200'],
+          }}
         />
       </Card>
     </Card>

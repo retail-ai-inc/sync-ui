@@ -1,6 +1,4 @@
-// src/pages/Sync/SyncList.tsx
-
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   Card,
   Button,
@@ -13,40 +11,43 @@ import {
   Dropdown,
   Menu,
   Checkbox,
+  Tooltip,
 } from 'antd';
 import { PlusOutlined, RedoOutlined, SettingOutlined } from '@ant-design/icons';
 import AddSync from './AddSync';
 import { fetchSyncList, startSync, stopSync, deleteSyncTask } from '@/services/ant-design-pro/sync';
 import { useNavigate } from '@umijs/max';
 
+interface SyncConn {
+  host?: string;
+  port?: string;
+  user?: string;
+  password?: string;
+  database?: string;
+}
+
+interface MappingItem {
+  sourceTable: string;
+  targetTable: string;
+}
+
 interface SyncItem {
   id: number;
   taskName?: string;
   sourceType: string;
-  source: string;
-  target: string;
   status: string;
-
-  // Additional fields for new columns
   lastUpdateTime?: string;
   lastRunTime?: string;
 
-  // For editing
-  sourceConn?: {
-    host?: string;
-    port?: string;
-    user?: string;
-    password?: string;
-    database?: string;
-  };
-  targetConn?: {
-    host?: string;
-    port?: string;
-    user?: string;
-    password?: string;
-    database?: string;
-  };
-  mappings?: { sourceTable: string; targetTable: string }[];
+  sourceConn?: SyncConn;
+  targetConn?: SyncConn;
+  mappings?: {
+    sourceDatabase?: string;
+    sourceSchema?: string;
+    tables: MappingItem[];
+    targetDatabase?: string;
+    targetSchema?: string;
+  }[];
 }
 
 const statusColorMap: Record<string, string> = {
@@ -59,8 +60,6 @@ const SyncList: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [syncList, setSyncList] = useState<SyncItem[]>([]);
   const [addModalOpen, setAddModalOpen] = useState(false);
-
-  // For editing
   const [editingRecord, setEditingRecord] = useState<SyncItem | null>(null);
 
   // Query
@@ -80,6 +79,7 @@ const SyncList: React.FC = () => {
   ]);
 
   const navigate = useNavigate();
+  const searchInputRef = useRef<Input>(null);
 
   // Load data
   const loadData = async () => {
@@ -87,16 +87,25 @@ const SyncList: React.FC = () => {
     try {
       const res = await fetchSyncList();
       if (res.success) {
+        console.log('res.data =>', res.data);
         setSyncList(res.data);
       }
     } catch (error) {
       message.error('Failed to load data');
     }
     setLoading(false);
+    if (searchInputRef.current) {
+      searchInputRef.current.blur();
+    }
   };
 
   useEffect(() => {
     loadData();
+
+    // Focus the search input after the component mounts
+    if (searchInputRef.current) {
+      searchInputRef.current.focus();
+    }
   }, []);
 
   // Start task
@@ -178,6 +187,12 @@ const SyncList: React.FC = () => {
       title: 'Task Name',
       dataIndex: 'taskName',
       key: 'taskName',
+      ellipsis: true,
+      render: (text: string) => (
+        <Tooltip title={text}>
+          <span>{text}</span>
+        </Tooltip>
+      ),
     },
     {
       title: 'Source Type',
@@ -188,11 +203,29 @@ const SyncList: React.FC = () => {
       title: 'Source',
       dataIndex: 'source',
       key: 'source',
+      ellipsis: true,
+      render: (_: any, record: SyncItem) => {
+        const text = record.sourceConn?.host || '';
+        return (
+          <Tooltip title={text}>
+            <span>{text}</span>
+          </Tooltip>
+        );
+      },
     },
     {
-      title: 'Target DB',
+      title: 'Target',
       dataIndex: 'target',
       key: 'target',
+      ellipsis: true,
+      render: (_: any, record: SyncItem) => {
+        const text = record.targetConn?.host || '';
+        return (
+          <Tooltip title={text}>
+            <span>{text}</span>
+          </Tooltip>
+        );
+      },
     },
     {
       title: 'Status',
@@ -244,9 +277,9 @@ const SyncList: React.FC = () => {
     const kw = searchValue.toLowerCase();
     return (
       (item.taskName || '').toLowerCase().includes(kw) ||
-      item.sourceType.toLowerCase().includes(kw) ||
-      item.source.toLowerCase().includes(kw) ||
-      item.target.toLowerCase().includes(kw)
+      (item.sourceType || '').toLowerCase().includes(kw) ||
+      (item.sourceConn?.host || '').toLowerCase().includes(kw) ||
+      (item.targetConn?.host || '').toLowerCase().includes(kw)
     );
   });
 
@@ -256,6 +289,7 @@ const SyncList: React.FC = () => {
       extra={
         <Space>
           <Input
+            ref={searchInputRef}
             placeholder="Search keyword"
             value={searchValue}
             onChange={handleSearchChange}
@@ -307,6 +341,7 @@ const SyncList: React.FC = () => {
         rowKey={(record) => record.id}
         loading={loading}
         pagination={false}
+        scroll={{ x: 'max-content' }}
       />
 
       <Modal

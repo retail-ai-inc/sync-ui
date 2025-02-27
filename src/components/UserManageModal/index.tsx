@@ -99,7 +99,7 @@ const UserManageModal: React.FC<UserManageModalProps> = ({ visible, onCancel, on
       title: intl.formatMessage({ id: 'pages.userManage.currentAccess' }),
       dataIndex: 'access',
       key: 'access',
-      render: (access) => <span>{access === 'admin' ? '管理员' : '普通用户'}</span>,
+      render: (access) => <span>{access === 'admin' ? 'admin' : 'guest'}</span>,
     },
     {
       title: intl.formatMessage({ id: 'pages.userManage.newAccess' }),
@@ -124,8 +124,8 @@ const UserManageModal: React.FC<UserManageModalProps> = ({ visible, onCancel, on
             }
           }}
           options={[
-            { value: 'admin', label: '管理员' },
-            { value: 'guest', label: '普通用户' },
+            { value: 'admin', label: 'admin' },
+            { value: 'guest', label: 'guest' },
           ]}
         />
       ),

@@ -104,7 +104,6 @@ export default defineConfig({
    * @doc https://umijs.org/docs/max/i18n
    */
   locale: {
-    // default zh-CN
     default: 'en-US',
     antd: true,
     // default true, when it is true, will use `navigator.language` overwrite default

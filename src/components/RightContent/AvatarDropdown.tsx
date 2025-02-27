@@ -1,5 +1,11 @@
 import { logout } from '@/services/ant-design-pro/user';
-import { LogoutOutlined, SettingOutlined, UserOutlined, LockOutlined } from '@ant-design/icons';
+import {
+  LogoutOutlined,
+  SettingOutlined,
+  UserOutlined,
+  LockOutlined,
+  TeamOutlined,
+} from '@ant-design/icons';
 import { history, useModel } from '@umijs/max';
 import { Spin } from 'antd';
 import type { MenuProps } from 'antd';
@@ -10,6 +16,7 @@ import { flushSync } from 'react-dom';
 import HeaderDropdown from '../HeaderDropdown';
 import PasswordModal from '@/components/PasswordModal';
 import { useIntl } from '@umijs/max';
+import UserManageModal from '@/components/UserManageModal';
 
 export type GlobalHeaderRightProps = {
   menu?: boolean;
@@ -64,6 +71,9 @@ export const AvatarDropdown: React.FC<GlobalHeaderRightProps> = ({ menu, childre
   // 添加密码修改模态框状态
   const [passwordModalVisible, setPasswordModalVisible] = useState(false);
 
+  // 添加用户管理模态框状态
+  const [userManageModalVisible, setUserManageModalVisible] = useState(false);
+
   const { styles } = useStyles();
   const { initialState, setInitialState } = useModel('@@initialState');
   const intl = useIntl();
@@ -80,6 +90,11 @@ export const AvatarDropdown: React.FC<GlobalHeaderRightProps> = ({ menu, childre
     // 处理密码修改菜单项点击
     if (key === 'password') {
       setPasswordModalVisible(true);
+      return;
+    }
+    // 处理用户管理菜单项点击
+    if (key === 'userManage') {
+      setUserManageModalVisible(true);
       return;
     }
     history.push(`/account/${key}`);
@@ -128,13 +143,18 @@ export const AvatarDropdown: React.FC<GlobalHeaderRightProps> = ({ menu, childre
           },
         ]
       : []),
-    // 只有管理员才显示修改密码选项
+    // 只有管理员才显示修改密码和用户管理选项
     ...(isAdmin
       ? [
           {
             key: 'password',
             icon: <LockOutlined />,
             label: intl.formatMessage({ id: 'menu.account.password' }),
+          },
+          {
+            key: 'userManage',
+            icon: <TeamOutlined />,
+            label: intl.formatMessage({ id: 'menu.account.userManage' }),
           },
         ]
       : []),
@@ -163,6 +183,13 @@ export const AvatarDropdown: React.FC<GlobalHeaderRightProps> = ({ menu, childre
         visible={passwordModalVisible}
         onCancel={() => setPasswordModalVisible(false)}
         onSuccess={() => setPasswordModalVisible(false)}
+      />
+
+      {/* 用户管理模态框 */}
+      <UserManageModal
+        visible={userManageModalVisible}
+        onCancel={() => setUserManageModalVisible(false)}
+        onSuccess={() => setUserManageModalVisible(false)}
       />
     </>
   );

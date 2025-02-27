@@ -5,7 +5,7 @@ declare namespace API {
   type CurrentUser = {
     name?: string;
     avatar?: string;
-    userid?: string;
+    userId?: string;
     email?: string;
     signature?: string;
     title?: string;
@@ -101,6 +101,11 @@ declare namespace API {
   };
 
   type UpdatePasswordResult = {
+    success?: boolean;
+    message?: string;
+  };
+
+  type UpdateAccessResult = {
     success?: boolean;
     message?: string;
   };

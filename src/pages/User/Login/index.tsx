@@ -5,9 +5,10 @@ import { LoginForm, ProFormCheckbox, ProFormText } from '@ant-design/pro-compone
 import { FormattedMessage, Helmet, history, SelectLang, useIntl, useModel } from '@umijs/max';
 import { Alert, message, Button } from 'antd';
 import { createStyles } from 'antd-style';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { flushSync } from 'react-dom';
 import Settings from '../../../../config/defaultSettings';
+import { getOAuthConfig } from '@/services/ant-design-pro/oauth';
 
 const useStyles = createStyles(({ token }) => {
   return {
@@ -72,9 +73,27 @@ const LoginMessage: React.FC<{
 
 const Login: React.FC = () => {
   const [userLoginState, setUserLoginState] = useState<API.LoginResult>({});
+  const [googleConfigLoaded, setGoogleConfigLoaded] = useState<boolean>(false);
+  const [googleConfig, setGoogleConfig] = useState<OAuthConfigResponse['data'] | null>(null);
   const { initialState, setInitialState } = useModel('@@initialState');
   const { styles } = useStyles();
   const intl = useIntl();
+
+  // 获取 Google OAuth 配置
+  useEffect(() => {
+    const loadGoogleConfig = async () => {
+      try {
+        const response = await getOAuthConfig('google');
+        setGoogleConfig(response.data);
+        setGoogleConfigLoaded(true);
+      } catch (error) {
+        console.error('加载Google登录配置失败:', error);
+        setGoogleConfigLoaded(false);
+      }
+    };
+
+    loadGoogleConfig();
+  }, []);
 
   const fetchUserInfo = async () => {
     const userInfo = await initialState?.fetchUserInfo?.();
@@ -115,18 +134,22 @@ const Login: React.FC = () => {
   };
 
   const handleGoogleLogin = () => {
-    // 动态获取当前主机和端口
-    const currentHost = window.location.origin;
-    const redirectUri = `${currentHost}/auth/google/callback`;
+    try {
+      if (!googleConfig) {
+        throw new Error('Google配置未加载');
+      }
+      const authUrl = `${googleConfig.authUri}?client_id=${
+        googleConfig.clientId
+      }&redirect_uri=${encodeURIComponent(googleConfig.redirectUri)}&scope=${googleConfig.scopes.join(
+        ' ',
+      )}&response_type=code`;
 
-    // Google OAuth 客户端ID应该根据环境配置
-    const clientId = '495370126123-jk59og3bur7uuqgsct21bvgsb9maeb9q.apps.googleusercontent.com';
-
-    // 构建授权URL
-    const googleAuthUrl = `https://accounts.google.com/o/oauth2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=email profile&response_type=code`;
-
-    console.log('重定向到Google授权页面，回调URL:', redirectUri);
-    window.location.href = googleAuthUrl;
+      console.log('重定向到Google授权页面');
+      window.location.href = authUrl;
+    } catch (error) {
+      message.error('获取Google登录配置失败');
+      console.error('获取Google配置错误:', error);
+    }
   };
 
   const { status } = userLoginState;
@@ -217,15 +240,17 @@ const Login: React.FC = () => {
             ></a>
           </div>
 
-          <div style={{ marginBottom: 24, textAlign: 'center' }}>
-            <Button
-              icon={<GoogleOutlined />}
-              style={{ width: '100%', marginTop: 16 }}
-              onClick={handleGoogleLogin}
-            >
-              Login with Google
-            </Button>
-          </div>
+          {googleConfigLoaded && (
+            <div style={{ marginBottom: 24, textAlign: 'center' }}>
+              <Button
+                icon={<GoogleOutlined />}
+                style={{ width: '100%', marginTop: 16 }}
+                onClick={handleGoogleLogin}
+              >
+                Login with Google
+              </Button>
+            </div>
+          )}
         </LoginForm>
       </div>
       <Footer />

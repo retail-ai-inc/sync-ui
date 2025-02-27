@@ -90,3 +90,35 @@ export async function getAuthStatus(options?: { [key: string]: any }) {
     ...(options || {}),
   });
 }
+
+/** 获取所有用户列表 GET /api/users */
+export async function getAllUsers(options?: { [key: string]: any }) {
+  return request<{
+    data: API.CurrentUser[];
+    success: boolean;
+    total?: number;
+  }>('/api/users', {
+    method: 'GET',
+    ...(options || {}),
+  });
+}
+
+/** 更新用户权限 PUT /api/users/access */
+export async function updateUserAccess(
+  userId: string,
+  params: { access: string },
+  options?: { [key: string]: any },
+) {
+  return request<{
+    success: boolean;
+    data?: API.CurrentUser;
+    errorMessage?: string;
+  }>('/api/users/access', {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: { ...params, userId },
+    ...(options || {}),
+  });
+}

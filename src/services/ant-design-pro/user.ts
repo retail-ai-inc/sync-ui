@@ -14,15 +14,20 @@ export async function currentUser(options?: { [key: string]: any }) {
 
 /** 退出登录接口 POST /api/logout */
 export async function logout(options?: { [key: string]: any }) {
-  return request<Record<string, any>>('/api/logout', {
+  const response = await request<Record<string, any>>('/api/logout', {
     method: 'POST',
     ...(options || {}),
   });
+
+  // 清除本地存储的 token
+  localStorage.removeItem('accessToken');
+
+  return response;
 }
 
 /** 登录接口 POST /api/login */
 export async function login(body: API.LoginParams, options?: { [key: string]: any }) {
-  return request<API.LoginResult>('/api/login', {
+  const response = await request<API.LoginResult>('/api/login', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -30,16 +35,58 @@ export async function login(body: API.LoginParams, options?: { [key: string]: an
     data: body,
     ...(options || {}),
   });
+
+  // 保存 token 到 localStorage
+  if (response.accessToken) {
+    localStorage.setItem('accessToken', response.accessToken);
+  }
+
+  return response;
 }
 
 /** Google OAuth 登录回调处理 */
 export async function handleGoogleCallback(code: string, options?: { [key: string]: any }) {
-  return request<API.LoginResult>('/api/login/google/callback', {
+  const response = await request<API.LoginResult>('/api/login/google/callback', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
     data: { code },
+    ...(options || {}),
+  });
+
+  // 保存 token 到 localStorage
+  if (response.accessToken) {
+    localStorage.setItem('accessToken', response.accessToken);
+  }
+
+  return response;
+}
+
+/** 修改管理员密码 PUT /api/updateAdminPassword */
+export async function updateAdminPassword(
+  params: { oldPassword: string; newPassword: string },
+  options?: { [key: string]: any },
+) {
+  return request<API.UpdatePasswordResult>('/api/updateAdminPassword', {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: params,
+    ...(options || {}),
+  });
+}
+
+/** 获取当前登录状态 GET /api/auth/status */
+export async function getAuthStatus(options?: { [key: string]: any }) {
+  return request<{
+    isAuthenticated: boolean;
+    tokenInfo?: {
+      expiresAt?: number;
+    };
+  }>('/api/auth/status', {
+    method: 'GET',
     ...(options || {}),
   });
 }

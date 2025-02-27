@@ -27,6 +27,9 @@ const GoogleCallback: React.FC = () => {
       setDebugInfo((prev) => prev + `\n获得响应: ${JSON.stringify(result)}`);
 
       if (result.status === 'ok') {
+        // token已在handleGoogleCallback函数中存储到localStorage
+        setDebugInfo((prev) => prev + `\n访问令牌已保存，长度: ${result.accessToken?.length || 0}`);
+
         message.success('Google登录成功');
         setLoginSuccess(true);
 

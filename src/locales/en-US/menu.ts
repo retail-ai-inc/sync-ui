@@ -45,8 +45,11 @@ export default {
   'menu.account.settings': 'Account Settings',
   'menu.account.trigger': 'Trigger Error',
   'menu.account.logout': 'Logout',
+  'menu.account.password': 'Change Password',
   'menu.editor': 'Graphic Editor',
   'menu.editor.flow': 'Flow Editor',
   'menu.editor.mind': 'Mind Editor',
   'menu.editor.koni': 'Koni Editor',
+  'menu.Data Sync Tasks': 'Data Sync Tasks',
+  'menu.数据同步监控': 'Data Sync Monitoring',
 };

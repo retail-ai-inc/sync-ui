@@ -1,13 +1,15 @@
 import { logout } from '@/services/ant-design-pro/user';
-import { LogoutOutlined, SettingOutlined, UserOutlined } from '@ant-design/icons';
+import { LogoutOutlined, SettingOutlined, UserOutlined, LockOutlined } from '@ant-design/icons';
 import { history, useModel } from '@umijs/max';
 import { Spin } from 'antd';
 import type { MenuProps } from 'antd';
 import { createStyles } from 'antd-style';
 import { stringify } from 'querystring';
-import React from 'react';
+import React, { useState } from 'react';
 import { flushSync } from 'react-dom';
 import HeaderDropdown from '../HeaderDropdown';
+import PasswordModal from '@/components/PasswordModal';
+import { useIntl } from '@umijs/max';
 
 export type GlobalHeaderRightProps = {
   menu?: boolean;
@@ -58,9 +60,13 @@ export const AvatarDropdown: React.FC<GlobalHeaderRightProps> = ({ menu, childre
       });
     }
   };
-  const { styles } = useStyles();
 
+  // 添加密码修改模态框状态
+  const [passwordModalVisible, setPasswordModalVisible] = useState(false);
+
+  const { styles } = useStyles();
   const { initialState, setInitialState } = useModel('@@initialState');
+  const intl = useIntl();
 
   const onMenuClick: MenuProps['onClick'] = (event) => {
     const { key } = event;
@@ -69,6 +75,11 @@ export const AvatarDropdown: React.FC<GlobalHeaderRightProps> = ({ menu, childre
         setInitialState((s) => ({ ...s, currentUser: undefined }));
       });
       loginOut();
+      return;
+    }
+    // 处理密码修改菜单项点击
+    if (key === 'password') {
+      setPasswordModalVisible(true);
       return;
     }
     history.push(`/account/${key}`);
@@ -96,40 +107,63 @@ export const AvatarDropdown: React.FC<GlobalHeaderRightProps> = ({ menu, childre
     return loading;
   }
 
-  const menuItems = [
+  // 检查用户是否为管理员
+  const isAdmin = currentUser && currentUser.access === 'admin';
+
+  const menuItems: ItemType[] = [
     ...(menu
       ? [
           {
             key: 'center',
             icon: <UserOutlined />,
-            label: '个人中心',
+            label: intl.formatMessage({ id: 'menu.account.center' }),
           },
           {
             key: 'settings',
             icon: <SettingOutlined />,
-            label: '个人设置',
+            label: intl.formatMessage({ id: 'menu.account.settings' }),
           },
           {
             type: 'divider' as const,
           },
         ]
       : []),
+    // 只有管理员才显示修改密码选项
+    ...(isAdmin
+      ? [
+          {
+            key: 'password',
+            icon: <LockOutlined />,
+            label: intl.formatMessage({ id: 'menu.account.password' }),
+          },
+        ]
+      : []),
     {
       key: 'logout',
       icon: <LogoutOutlined />,
-      label: 'Logout',
+      label: intl.formatMessage({ id: 'menu.account.logout' }),
     },
   ];
 
+  // 渲染下拉菜单和模态框
   return (
-    <HeaderDropdown
-      menu={{
-        selectedKeys: [],
-        onClick: onMenuClick,
-        items: menuItems,
-      }}
-    >
-      {children}
-    </HeaderDropdown>
+    <>
+      <HeaderDropdown
+        menu={{
+          selectedKeys: [],
+          onClick: onMenuClick,
+          items: menuItems,
+        }}
+      >
+        {children}
+      </HeaderDropdown>
+
+      {/* 密码修改模态框 */}
+      <PasswordModal
+        visible={passwordModalVisible}
+        onCancel={() => setPasswordModalVisible(false)}
+        onSuccess={() => setPasswordModalVisible(false)}
+      />
+    </>
   );
 };

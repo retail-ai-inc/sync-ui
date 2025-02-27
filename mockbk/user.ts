@@ -17,6 +17,9 @@ const { ANT_DESIGN_PRO_ONLY_DO_NOT_USE_IN_YOUR_PRODUCTION } = process.env;
  */
 let access = ANT_DESIGN_PRO_ONLY_DO_NOT_USE_IN_YOUR_PRODUCTION === 'site' ? 'admin' : '';
 
+// 保存管理员密码
+let adminPassword = 'admin';
+
 const getAccess = () => {
   return access;
 };
@@ -50,7 +53,7 @@ export default {
   'POST /api/login': async (req: Request, res: Response) => {
     const { password, username, type } = req.body;
     await waitTime(2000);
-    if (password === 'admin' && username === 'admin') {
+    if (password === adminPassword && username === 'admin') {
       res.send({
         status: 'ok',
         type,
@@ -71,25 +74,45 @@ export default {
     access = '';
     res.send({ data: {}, success: true });
   },
-  'POST /api/login/google/callback': async (req: Request, res: Response) => {
-    const { code } = req.body;
+  'POST /api/login/google/callback': {
+    status: 'ok',
+    type: 'google',
+    currentAuthority: 'admin',
+    accessToken: 'google-mock-access-token-12345',
+  },
+  'POST /api/login/account': {
+    status: 'ok',
+    type: 'account',
+    currentAuthority: 'admin',
+    accessToken: 'mock-access-token-12345',
+  },
+  'PUT /api/updateAdminPassword': (req: Request, res: Response) => {
+    const { oldPassword, newPassword } = req.body;
 
-    if (code) {
-      console.log('Mock处理Google回调，授权码:', code.substring(0, 10) + '...');
-      res.send({
-        status: 'ok',
-        type: 'google',
-        currentAuthority: 'admin',
+    // 检查用户是否已登录且是admin
+    if (!getAccess() || getAccess() !== 'admin') {
+      res.status(403).send({
+        success: false,
+        message: 'No permission to perform this operation',
       });
-      access = 'admin';
       return;
     }
 
+    // 验证旧密码
+    if (oldPassword !== adminPassword) {
+      res.send({
+        success: false,
+        message: 'Current password is incorrect',
+      });
+      return;
+    }
+
+    // 更新密码
+    adminPassword = newPassword;
+
     res.send({
-      status: 'error',
-      type: 'google',
-      currentAuthority: 'guest',
+      success: true,
+      message: 'Password changed successfully',
     });
-    access = 'guest';
   },
 };

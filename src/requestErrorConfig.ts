@@ -89,8 +89,21 @@ export const errorConfig: RequestConfig = {
   requestInterceptors: [
     (config: RequestOptions) => {
       // 拦截请求配置，进行个性化处理。
-      const url = config?.url?.concat('?token = 123');
-      return { ...config, url };
+      const token = localStorage.getItem('accessToken');
+      const tokenType = localStorage.getItem('tokenType') || 'Bearer';
+
+      // 只有当token存在时才添加到请求头
+      if (token) {
+        return {
+          ...config,
+          headers: {
+            ...config.headers,
+            Authorization: `${tokenType} ${token}`,
+          },
+        };
+      }
+
+      return config;
     },
   ],
 

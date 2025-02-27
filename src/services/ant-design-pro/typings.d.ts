@@ -27,6 +27,7 @@ declare namespace API {
     status?: string;
     type?: string;
     currentAuthority?: string;
+    accessToken?: string;
   };
 
   type PageParams = {
@@ -97,5 +98,10 @@ declare namespace API {
     datetime?: string;
     description?: string;
     type?: NoticeIconItemType;
+  };
+
+  type UpdatePasswordResult = {
+    success?: boolean;
+    message?: string;
   };
 }

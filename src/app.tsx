@@ -1,4 +1,4 @@
-import { AvatarDropdown, AvatarName, Footer, SelectLang } from '@/components';
+import { AvatarDropdown, AvatarName, Footer } from '@/components';
 import { currentUser as queryCurrentUser } from '@/services/ant-design-pro/user';
 import type { Settings as LayoutSettings } from '@ant-design/pro-components';
 import { SettingDrawer } from '@ant-design/pro-components';
@@ -31,7 +31,8 @@ export async function getInitialState(): Promise<{
     }
     return undefined;
   };
-  // 如果不是登录页面或Google回调页面，才执行获取用户信息
+
+  // 如果是Google回调页面，不要立即获取用户信息
   const { location } = history;
   if (location.pathname !== loginPath && !location.pathname.startsWith('/auth/google/callback')) {
     const currentUser = await fetchUserInfo();
@@ -50,7 +51,7 @@ export async function getInitialState(): Promise<{
 // ProLayout 支持的api https://procomponents.ant.design/components/layout
 export const layout: RunTimeLayoutConfig = ({ initialState, setInitialState }) => {
   return {
-    actionsRender: () => [<SelectLang key="SelectLang" />],
+    actionsRender: undefined,
     avatarProps: {
       src: initialState?.currentUser?.avatar,
       title: <AvatarName />,

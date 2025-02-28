@@ -46,21 +46,32 @@ export async function login(body: API.LoginParams, options?: { [key: string]: an
 
 /** Google OAuth 登录回调处理 */
 export async function handleGoogleCallback(code: string, options?: { [key: string]: any }) {
-  const response = await request<API.LoginResult>('/api/login/google/callback', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    data: { code },
-    ...(options || {}),
-  });
+  try {
+    const response = await request<API.LoginResult & { errorMessage?: string }>(
+      '/api/login/google/callback',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        data: { code },
+        ...(options || {}),
+      },
+    );
 
-  // 保存 token 到 localStorage
-  if (response.accessToken) {
-    localStorage.setItem('accessToken', response.accessToken);
+    // 只有在响应中有accessToken时才保存token
+    if (response.accessToken) {
+      localStorage.setItem('accessToken', response.accessToken);
+    }
+
+    return response;
+  } catch (error) {
+    console.error('Google callback API调用失败:', error);
+    return {
+      status: 'error',
+      errorMessage: '登录服务暂时不可用，请稍后再试',
+    };
   }
-
-  return response;
 }
 
 /** 修改管理员密码 PUT /api/updateAdminPassword */
@@ -103,10 +114,25 @@ export async function getAllUsers(options?: { [key: string]: any }) {
   });
 }
 
-/** 更新用户权限 PUT /api/users/access */
+/** 删除用户 DELETE /api/users */
+export async function deleteUser(userId: string, options?: { [key: string]: any }) {
+  return request<{
+    success: boolean;
+    message?: string;
+  }>('/api/users', {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: { userId },
+    ...(options || {}),
+  });
+}
+
+/** 更新用户权限和状态 PUT /api/users/access */
 export async function updateUserAccess(
   userId: string,
-  params: { access: string },
+  params: { access?: string; status?: string },
   options?: { [key: string]: any },
 ) {
   return request<{

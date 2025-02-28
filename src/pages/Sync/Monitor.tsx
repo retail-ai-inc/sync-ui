@@ -19,7 +19,7 @@ import {
   Switch,
   Checkbox,
 } from 'antd';
-import { useSearchParams, useNavigate } from '@umijs/max';
+import { useSearchParams, useNavigate, useAccess } from '@umijs/max';
 import {
   fetchMonitorData,
   fetchSyncLogs,
@@ -94,6 +94,9 @@ const Monitor: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const taskId = searchParams.get('taskId');
+
+  const access = useAccess();
+  const isGuest = !access.canAdmin;
 
   // ========== Reusable "loadMetrics" with parameters ==========
   const loadMetricsImpl = async (rangeParam?: string, startTime?: string, endTime?: string) => {
@@ -357,8 +360,19 @@ const Monitor: React.FC = () => {
       }
       extra={
         <Space>
-          <Button onClick={handlePause}>Pause</Button>
-          <Button onClick={handleResume} type="primary">
+          <Button
+            onClick={handlePause}
+            disabled={isGuest}
+            title={isGuest ? 'Guest用户无权操作' : ''}
+          >
+            Pause
+          </Button>
+          <Button
+            onClick={handleResume}
+            type="primary"
+            disabled={isGuest}
+            title={isGuest ? 'Guest用户无权操作' : ''}
+          >
             Resume
           </Button>
           <Switch

@@ -1,8 +1,9 @@
-import { Table, Modal, message, Select, Button, Space } from 'antd';
+import { Table, Modal, message, Select, Button, Space, Switch, Popconfirm } from 'antd';
 import React, { useState, useEffect } from 'react';
-import { useIntl } from '@umijs/max';
-import { getAllUsers, updateUserAccess } from '@/services/ant-design-pro/user';
+import { useIntl, useAccess } from '@umijs/max';
+import { getAllUsers, updateUserAccess, deleteUser } from '@/services/ant-design-pro/user';
 import type { ColumnsType } from 'antd/es/table';
+import { DeleteOutlined } from '@ant-design/icons';
 
 interface UserManageModalProps {
   visible: boolean;
@@ -13,6 +14,7 @@ interface UserManageModalProps {
 interface UserTableItem extends API.CurrentUser {
   key: string;
   pendingAccess?: string;
+  pendingStatus?: string;
 }
 
 const UserManageModal: React.FC<UserManageModalProps> = ({ visible, onCancel, onSuccess }) => {
@@ -21,6 +23,8 @@ const UserManageModal: React.FC<UserManageModalProps> = ({ visible, onCancel, on
   const [userList, setUserList] = useState<UserTableItem[]>([]);
   const [selectedRows, setSelectedRows] = useState<UserTableItem[]>([]);
   const intl = useIntl();
+  const access = useAccess();
+  const isGuest = !access.canAdmin;
 
   // 获取用户列表
   const fetchUsers = async () => {
@@ -52,32 +56,47 @@ const UserManageModal: React.FC<UserManageModalProps> = ({ visible, onCancel, on
     }
   }, [visible]);
 
-  // 更新用户的权限
-  const updateSelectedUsersAccess = async (newAccess: string) => {
+  // 更新用户的权限和状态
+  const updateSelectedUsersAccess = async (
+    userId: string,
+    params: { access?: string; status?: string },
+  ) => {
     try {
       setLoading(true);
+      const result = await updateUserAccess(userId, params);
 
-      // 批量更新选中的用户权限
-      const updatePromises = selectedRows.map((user) =>
-        updateUserAccess(user.userId || '', { access: newAccess }),
-      );
-
-      const results = await Promise.all(updatePromises);
-
-      // 检查是否所有更新都成功
-      const allSuccess = results.every((result) => result.success);
-
-      if (allSuccess) {
+      if (result.success) {
         message.success(intl.formatMessage({ id: 'pages.userManage.updateSuccess' }));
         await fetchUsers(); // 刷新用户列表
         setSelectedRows([]); // 清空选择
-        onSuccess();
+        onSuccess(); // 通知父组件操作成功
       } else {
         message.error(intl.formatMessage({ id: 'pages.userManage.updateFailed' }));
       }
     } catch (error) {
-      console.error('更新用户权限失败:', error);
+      console.error('更新用户信息失败:', error);
       message.error(intl.formatMessage({ id: 'pages.userManage.updateFailed' }));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 删除用户
+  const handleDeleteUser = async (userId: string) => {
+    try {
+      setLoading(true);
+      const result = await deleteUser(userId);
+
+      if (result.success) {
+        message.success(intl.formatMessage({ id: 'pages.userManage.deleteSuccess' }));
+        await fetchUsers(); // 刷新用户列表
+        onSuccess(); // 通知父组件操作成功
+      } else {
+        message.error(intl.formatMessage({ id: 'pages.userManage.deleteFailed' }));
+      }
+    } catch (error) {
+      console.error('删除用户失败:', error);
+      message.error(intl.formatMessage({ id: 'pages.userManage.deleteFailed' }));
     } finally {
       setLoading(false);
     }
@@ -114,20 +133,67 @@ const UserManageModal: React.FC<UserManageModalProps> = ({ visible, onCancel, on
               user.key === record.key ? { ...user, pendingAccess: value } : user,
             );
             setUserList(updatedList);
-
-            // 如果用户已在选中行中，更新选中行
-            if (selectedRows.some((row) => row.key === record.key)) {
-              const updatedSelectedRows = selectedRows.map((row) =>
-                row.key === record.key ? { ...row, pendingAccess: value } : row,
-              );
-              setSelectedRows(updatedSelectedRows);
-            }
           }}
           options={[
             { value: 'admin', label: 'admin' },
             { value: 'guest', label: 'guest' },
           ]}
         />
+      ),
+    },
+    {
+      title: intl.formatMessage({ id: 'pages.userManage.status' }),
+      dataIndex: 'status',
+      key: 'status',
+      render: (status) => (
+        <span style={{ color: status === 'active' ? 'green' : 'red' }}>
+          {status === 'active'
+            ? intl.formatMessage({ id: 'pages.userManage.active' })
+            : intl.formatMessage({ id: 'pages.userManage.inactive' })}
+        </span>
+      ),
+    },
+    {
+      title: intl.formatMessage({ id: 'pages.userManage.changeStatus' }),
+      key: 'changeStatus',
+      render: (_, record) => (
+        <Switch
+          checked={record.status === 'active'}
+          onChange={(checked) => {
+            const newStatus = checked ? 'active' : 'inactive';
+            updateSelectedUsersAccess(record.userId || '', { status: newStatus });
+          }}
+          disabled={isGuest}
+        />
+      ),
+    },
+    {
+      title: intl.formatMessage({ id: 'pages.userManage.actions' }),
+      key: 'actions',
+      render: (_, record) => (
+        <Popconfirm
+          title={intl.formatMessage({ id: 'pages.userManage.deleteConfirm' })}
+          onConfirm={() => handleDeleteUser(record.userId || '')}
+          okText={intl.formatMessage({ id: 'pages.userManage.yes' })}
+          cancelText={intl.formatMessage({ id: 'pages.userManage.no' })}
+          disabled={isGuest}
+        >
+          <Button
+            danger
+            type="default"
+            icon={<DeleteOutlined />}
+            style={{
+              borderColor: '#ff4d4f',
+              display: 'flex',
+              alignItems: 'center',
+              padding: '0 8px',
+            }}
+            disabled={isGuest}
+            title={isGuest ? 'Guest用户无权操作' : ''}
+          >
+            {intl.formatMessage({ id: 'pages.userManage.delete' })}
+          </Button>
+        </Popconfirm>
       ),
     },
   ];
@@ -139,19 +205,14 @@ const UserManageModal: React.FC<UserManageModalProps> = ({ visible, onCancel, on
       <Button
         type="primary"
         loading={loading}
-        disabled={selectedRows.length === 0}
+        disabled={selectedRows.length === 0 || isGuest}
         onClick={() => {
-          // 获取选中行中设置了 pendingAccess 的用户，并按权限分组
-          const adminUsers = selectedRows.filter((user) => user.pendingAccess === 'admin');
-          const guestUsers = selectedRows.filter((user) => user.pendingAccess === 'guest');
-
-          if (adminUsers.length > 0) {
-            updateSelectedUsersAccess('admin');
-          }
-
-          if (guestUsers.length > 0) {
-            updateSelectedUsersAccess('guest');
-          }
+          // 处理已选择行的权限变更
+          selectedRows.forEach((user) => {
+            if (user.pendingAccess) {
+              updateSelectedUsersAccess(user.userId || '', { access: user.pendingAccess });
+            }
+          });
         }}
       >
         {intl.formatMessage({ id: 'pages.userManage.apply' })}
@@ -165,7 +226,7 @@ const UserManageModal: React.FC<UserManageModalProps> = ({ visible, onCancel, on
       open={visible}
       onCancel={onCancel}
       footer={renderFooter()}
-      width={800}
+      width={1000}
       maskClosable={false}
     >
       <Table

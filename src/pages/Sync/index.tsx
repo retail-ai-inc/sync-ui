@@ -16,7 +16,7 @@ import {
 import { PlusOutlined, RedoOutlined, SettingOutlined } from '@ant-design/icons';
 import AddSync from './AddSync';
 import { fetchSyncList, startSync, stopSync, deleteSyncTask } from '@/services/ant-design-pro/sync';
-import { useNavigate } from '@umijs/max';
+import { useNavigate, useAccess } from '@umijs/max';
 
 interface SyncConn {
   host?: string;
@@ -80,6 +80,8 @@ const SyncList: React.FC = () => {
 
   const navigate = useNavigate();
   const searchInputRef = useRef<Input>(null);
+  const access = useAccess();
+  const isGuest = !access.canAdmin;
 
   // Load data
   const loadData = async () => {
@@ -251,17 +253,38 @@ const SyncList: React.FC = () => {
       render: (_: any, record: SyncItem) => (
         <Space>
           {record.status === 'Running' ? (
-            <Button onClick={() => handleStop(record.id)} danger>
+            <Button
+              onClick={() => handleStop(record.id)}
+              danger
+              disabled={isGuest}
+              title={isGuest ? 'Guest用户无权操作' : ''}
+            >
               Stop
             </Button>
           ) : (
-            <Button onClick={() => handleStart(record.id)} type="primary">
+            <Button
+              onClick={() => handleStart(record.id)}
+              type="primary"
+              disabled={isGuest}
+              title={isGuest ? 'Guest用户无权操作' : ''}
+            >
               Start
             </Button>
           )}
           <Button onClick={() => navigate(`/Sync/monitor?taskId=${record.id}`)}>Monitor</Button>
-          <Button onClick={() => handleEdit(record)}>Edit</Button>
-          <Button danger onClick={() => handleDelete(record)}>
+          <Button
+            onClick={() => handleEdit(record)}
+            disabled={isGuest}
+            title={isGuest ? 'Guest用户无权操作' : ''}
+          >
+            Edit
+          </Button>
+          <Button
+            danger
+            onClick={() => handleDelete(record)}
+            disabled={isGuest}
+            title={isGuest ? 'Guest用户无权操作' : ''}
+          >
             Delete
           </Button>
         </Space>
@@ -329,6 +352,8 @@ const SyncList: React.FC = () => {
               setEditingRecord(null);
               setAddModalOpen(true);
             }}
+            disabled={isGuest}
+            title={isGuest ? 'Guest用户无权操作' : ''}
           >
             Add new sync task
           </Button>

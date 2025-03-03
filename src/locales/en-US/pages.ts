@@ -201,4 +201,19 @@ export default {
     'Please upload the OAuth client JSON configuration file from Google Cloud Console',
   'pages.settings.auth.googleConfigHelp.description':
     'You need to create an OAuth client ID in Google Cloud Console and download the JSON configuration file. Make sure you have set the correct redirect URI for your application callback.',
+
+  'pages.syncSettings.advancedSecurity': 'Advanced Security Options (Field Encryption/Masking)',
+  'pages.syncSettings.table': 'Table: ',
+  'pages.syncSettings.fieldName': 'Field Name',
+  'pages.syncSettings.fieldType': 'Type',
+  'pages.syncSettings.fieldStatus': 'Status',
+  'pages.syncSettings.operation': 'Operation',
+  'pages.syncSettings.status.normal': 'Normal',
+  'pages.syncSettings.status.masked': 'Masked',
+  'pages.syncSettings.status.encrypted': 'Encrypted',
+  'pages.syncSettings.action.mask': 'Mask',
+  'pages.syncSettings.action.encrypt': 'Encrypt',
+  'pages.syncSettings.action.restore': 'Restore',
+  'pages.syncSettings.message.fieldStatusChanged':
+    'The status of field {field} in table {table} has been changed to {status}',
 };

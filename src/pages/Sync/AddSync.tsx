@@ -5,10 +5,23 @@ import {
   ProFormSelect,
   ProFormDependency,
 } from '@ant-design/pro-components';
-import { Modal, message, Button, Transfer, Space } from 'antd';
+import {
+  Modal,
+  message,
+  Button,
+  Transfer,
+  Space,
+  Switch,
+  Table,
+  Typography,
+  Tag,
+  Collapse,
+} from 'antd';
+import { LockOutlined, EyeInvisibleOutlined, UndoOutlined } from '@ant-design/icons';
 import type { TransferProps } from 'antd';
 import type { FormInstance } from 'antd';
 import { addSyncTask, updateSyncTask } from '@/services/ant-design-pro/sync';
+import { useIntl } from '@umijs/max';
 
 interface SyncConn {
   host?: string;
@@ -78,7 +91,149 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
   const [tableData, setTableData] = useState<{ key: string; title: string; description: string }[]>(
     [],
   );
+  const [showSecurityOptions, setShowSecurityOptions] = useState(false);
   const formRef = useRef<FormInstance>();
+
+  // 添加 intl 实例
+  const intl = useIntl();
+
+  // 将 fieldsMockData 改为普通状态变量，以支持更新
+  const [fieldsMockData, setFieldsMockData] = useState({
+    users: [
+      { key: 'users_id', name: 'id', type: 'int', status: 'normal' },
+      { key: 'users_name', name: 'name', type: 'varchar', status: 'masked' },
+      { key: 'users_email', name: 'email', type: 'varchar', status: 'encrypted' },
+      { key: 'users_password', name: 'password', type: 'varchar', status: 'encrypted' },
+      { key: 'users_address', name: 'address', type: 'varchar', status: 'normal' },
+      { key: 'users_phone', name: 'phone', type: 'varchar', status: 'masked' },
+    ],
+    orders: [
+      { key: 'orders_id', name: 'id', type: 'int', status: 'normal' },
+      { key: 'orders_user_id', name: 'user_id', type: 'int', status: 'normal' },
+      { key: 'orders_amount', name: 'amount', type: 'decimal', status: 'normal' },
+      { key: 'orders_card_number', name: 'card_number', type: 'varchar', status: 'masked' },
+      { key: 'orders_cvv', name: 'cvv', type: 'varchar', status: 'encrypted' },
+    ],
+  });
+
+  // 修改处理字段状态修改的函数，实际更新状态
+  const handleFieldStatusChange = (table: string, fieldKey: string, newStatus: string) => {
+    // 创建一个深拷贝以避免直接修改状态
+    const updatedData = JSON.parse(JSON.stringify(fieldsMockData));
+
+    // 找到对应的表和字段并更新其状态
+    if (updatedData[table]) {
+      const fieldIndex = updatedData[table].findIndex((field: any) => field.key === fieldKey);
+      if (fieldIndex !== -1) {
+        const statusMap: { [key: string]: string } = {
+          [intl.formatMessage({ id: 'pages.syncSettings.status.masked' })]: 'masked',
+          [intl.formatMessage({ id: 'pages.syncSettings.status.encrypted' })]: 'encrypted',
+          [intl.formatMessage({ id: 'pages.syncSettings.status.normal' })]: 'normal',
+        };
+
+        updatedData[table][fieldIndex].status = statusMap[newStatus] || 'normal';
+
+        // 更新状态
+        setFieldsMockData(updatedData);
+        message.success(
+          intl.formatMessage(
+            { id: 'pages.syncSettings.message.fieldStatusChanged' },
+            {
+              table: table,
+              field: fieldKey.split('_')[1],
+              status: newStatus,
+            },
+          ),
+        );
+      }
+    }
+  };
+
+  // 定义字段表格列
+  const fieldsColumns = [
+    {
+      title: intl.formatMessage({ id: 'pages.syncSettings.fieldName' }),
+      dataIndex: 'name',
+      key: 'name',
+    },
+    {
+      title: intl.formatMessage({ id: 'pages.syncSettings.fieldType' }),
+      dataIndex: 'type',
+      key: 'type',
+    },
+    {
+      title: intl.formatMessage({ id: 'pages.syncSettings.fieldStatus' }),
+      dataIndex: 'status',
+      key: 'status',
+      render: (status: string) => {
+        let color = 'green';
+        let text = intl.formatMessage({ id: 'pages.syncSettings.status.normal' });
+
+        if (status === 'masked') {
+          color = 'orange';
+          text = intl.formatMessage({ id: 'pages.syncSettings.status.masked' });
+        } else if (status === 'encrypted') {
+          color = 'red';
+          text = intl.formatMessage({ id: 'pages.syncSettings.status.encrypted' });
+        }
+
+        return <Tag color={color}>{text}</Tag>;
+      },
+    },
+    {
+      title: intl.formatMessage({ id: 'pages.syncSettings.operation' }),
+      key: 'action',
+      render: (_, record: any) => {
+        const tableName = record.key.split('_')[0];
+        return (
+          <Space>
+            <Button
+              icon={<EyeInvisibleOutlined />}
+              size="small"
+              onClick={() =>
+                handleFieldStatusChange(
+                  tableName,
+                  record.key,
+                  intl.formatMessage({ id: 'pages.syncSettings.status.masked' }),
+                )
+              }
+              disabled={record.status === 'masked'}
+            >
+              {intl.formatMessage({ id: 'pages.syncSettings.action.mask' })}
+            </Button>
+            <Button
+              icon={<LockOutlined />}
+              size="small"
+              onClick={() =>
+                handleFieldStatusChange(
+                  tableName,
+                  record.key,
+                  intl.formatMessage({ id: 'pages.syncSettings.status.encrypted' }),
+                )
+              }
+              disabled={record.status === 'encrypted'}
+            >
+              {intl.formatMessage({ id: 'pages.syncSettings.action.encrypt' })}
+            </Button>
+            <Button
+              icon={<UndoOutlined />}
+              size="small"
+              onClick={() =>
+                handleFieldStatusChange(
+                  tableName,
+                  record.key,
+                  intl.formatMessage({ id: 'pages.syncSettings.status.normal' }),
+                )
+              }
+              disabled={record.status === 'normal'}
+            >
+              {intl.formatMessage({ id: 'pages.syncSettings.action.restore' })}
+            </Button>
+          </Space>
+        );
+      },
+    },
+  ];
 
   // 编辑任务时，根据 record.mappings 初始化 Transfer 选择
   useEffect(() => {
@@ -577,6 +732,40 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
           render={(item) => item.title}
           listStyle={{ width: 200, height: 300 }}
         />
+
+        {/* 添加高级安全选项开关 */}
+        <div style={{ marginTop: 24, borderTop: '1px dashed #ccc', paddingTop: 16 }}>
+          <Switch
+            checked={showSecurityOptions}
+            onChange={setShowSecurityOptions}
+            style={{ marginRight: 8 }}
+          />
+          <Typography.Text strong>
+            {intl.formatMessage({ id: 'pages.syncSettings.advancedSecurity' })}
+          </Typography.Text>
+        </div>
+
+        {/* 显示表字段及操作 */}
+        {showSecurityOptions && (
+          <div style={{ marginTop: 16 }}>
+            <Collapse>
+              {targetKeys.map((tableName) => (
+                <Collapse.Panel
+                  header={`${intl.formatMessage({ id: 'pages.syncSettings.table' })}${tableName}`}
+                  key={tableName}
+                >
+                  <Table
+                    dataSource={fieldsMockData[tableName as keyof typeof fieldsMockData] || []}
+                    columns={fieldsColumns}
+                    pagination={false}
+                    size="small"
+                    rowKey="key"
+                  />
+                </Collapse.Panel>
+              ))}
+            </Collapse>
+          </div>
+        )}
       </StepsForm.StepForm>
     </StepsForm>
   );

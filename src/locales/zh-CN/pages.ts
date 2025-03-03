@@ -179,4 +179,17 @@ export default {
     '请上传从Google Cloud Console获取的OAuth客户端JSON配置文件',
   'pages.settings.auth.googleConfigHelp.description':
     '您需要在Google Cloud Console创建OAuth客户端ID，并下载JSON配置文件。确保已设置正确的重定向URI为您的应用回调地址。',
+  'pages.syncSettings.advancedSecurity': '高级安全选项（字段加密/屏蔽）',
+  'pages.syncSettings.table': '表：',
+  'pages.syncSettings.fieldName': '字段名',
+  'pages.syncSettings.fieldType': '类型',
+  'pages.syncSettings.fieldStatus': '状态',
+  'pages.syncSettings.operation': '操作',
+  'pages.syncSettings.status.normal': '正常',
+  'pages.syncSettings.status.masked': '已屏蔽',
+  'pages.syncSettings.status.encrypted': '已加密',
+  'pages.syncSettings.action.mask': '屏蔽',
+  'pages.syncSettings.action.encrypt': '加密',
+  'pages.syncSettings.action.restore': '恢复',
+  'pages.syncSettings.message.fieldStatusChanged': '已将{table}表的{field}字段状态修改为{status}',
 };

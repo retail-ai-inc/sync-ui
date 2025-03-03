@@ -1,0 +1,199 @@
+.dataFlowTab,
+.monitoringTab {
+  margin-bottom: 24px;
+}
+
+.dbItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.dbItem:last-child {
+  border-bottom: none;
+}
+
+.dbInfo {
+  display: flex;
+  align-items: center;
+}
+
+.dbIcon {
+  font-size: 24px;
+  margin-right: 16px;
+  color: #1890ff;
+}
+
+.statusTag {
+  margin-left: 16px;
+}
+
+.expandedRow {
+  padding: 16px 0;
+}
+
+.expandCard {
+  background: #f8f8f8;
+}
+
+.mappingItem,
+.transformItem,
+.metricItem {
+  margin-bottom: 8px;
+}
+
+.statCard {
+  height: 140px;
+  margin-bottom: 24px;
+}
+
+.statContent {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 8px 0;
+}
+
+.statTitle {
+  font-size: 14px;
+  color: rgba(0, 0, 0, 0.65);
+}
+
+.statValue {
+  font-size: 24px;
+  font-weight: 600;
+  margin: 12px 0;
+  display: flex;
+  align-items: center;
+}
+
+.statFooter {
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
+  margin-top: auto;
+  padding-bottom: 8px;
+}
+
+.dataFlowCard {
+  margin-bottom: 24px;
+}
+
+.chartPlaceholder {
+  height: 300px;
+  position: relative;
+  background-color: #f9f9f9;
+  border-radius: 2px;
+}
+
+.chartLegend {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: flex;
+  gap: 16px;
+}
+
+.legendItem {
+  display: flex;
+  align-items: center;
+  font-size: 12px;
+}
+
+.blueDot,
+.greenDot,
+.redDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 8px;
+}
+
+.blueDot {
+  background-color: #1890ff;
+}
+
+.greenDot {
+  background-color: #52c41a;
+}
+
+.redDot {
+  background-color: #f5222d;
+}
+
+.chartImage {
+  width: 100%;
+  height: 100%;
+  background-image: linear-gradient(
+    90deg,
+    rgba(24, 144, 255, 0.1) 0%,
+    rgba(24, 144, 255, 0.5) 50%,
+    rgba(24, 144, 255, 0.1) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 3s infinite;
+}
+
+.alertItem {
+  display: flex;
+  padding: 16px;
+  background-color: #fffbe6;
+  border-radius: 2px;
+  margin-bottom: 16px;
+}
+
+.alertIcon {
+  font-size: 24px;
+  margin-right: 16px;
+}
+
+.alertContent {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.alertActions {
+  margin-top: 8px;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -100% 0;
+  }
+  100% {
+    background-position: 100% 0;
+  }
+}
+
+.trendCard {
+  margin-bottom: 24px;
+}
+
+.loadingContainer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 300px;
+}
+
+.chartControls {
+  margin-bottom: 16px;
+}
+
+.timeRangeSelector {
+  margin-bottom: 16px;
+}
+
+.displayOptions {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.emptyContainer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 300px;
+}

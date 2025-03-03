@@ -20,11 +20,13 @@ export default [
         path: '/user/login',
         component: './User/Login',
       },
+      { component: './404' },
     ],
   },
+  { path: '/dashboard', name: 'dashboard', icon: 'dashboard', component: './Dashboard' },
   {
-    name: 'Data Sync Tasks',
-    icon: 'table',
+    name: 'sync',
+    icon: 'sync',
     path: '/Sync',
     component: './Sync',
   },
@@ -34,10 +36,7 @@ export default [
     component: './Sync/Monitor',
     hideInMenu: true, // 不在菜单中显示
   },
-  {
-    path: '/',
-    redirect: '/Sync',
-  },
+  { path: '/', redirect: '/dashboard' },
   {
     path: '/auth/google/callback',
     component: './User/GoogleCallback',

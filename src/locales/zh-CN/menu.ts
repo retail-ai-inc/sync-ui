@@ -7,7 +7,7 @@ export default {
   'menu.login': '登录',
   'menu.register': '注册',
   'menu.register-result': '注册结果',
-  'menu.dashboard': 'Dashboard',
+  'menu.dashboard': '数据仪表盘',
   'menu.dashboard.analysis': '分析页',
   'menu.dashboard.monitor': '监控页',
   'menu.dashboard.workplace': '工作台',
@@ -53,4 +53,5 @@ export default {
   'menu.editor.koni': '拓扑编辑器',
   'menu.Data Sync Tasks': '数据同步任务',
   'menu.数据同步监控': '数据同步监控',
+  'menu.sync': '数据同步任务',
 };

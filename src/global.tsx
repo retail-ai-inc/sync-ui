@@ -89,3 +89,48 @@ if (pwa) {
 
   clearCache();
 }
+
+// 保存原始error方法
+const originalError = message.error;
+
+// 重写error方法，确保返回正确的类型
+message.error = function (content, ...args): any {
+  // 判断错误内容是否与特定错误相关
+  if (
+    typeof content === 'string' &&
+    (content.includes('No specified OAuth configuration found') ||
+      content === '请求失败！' ||
+      content === 'Failed to fetch settings' ||
+      content === '' || // 空白错误
+      content.includes('请求失败'))
+  ) {
+    // 对特定错误，不显示任何消息
+    console.log('已拦截错误提示:', content);
+
+    // 返回一个兼容MessageType的对象
+    return {
+      _dummy: true,
+      then: () => ({ _dummy: true }),
+    };
+  }
+
+  // 对其他错误，正常显示
+  return originalError(content, ...args);
+};
+
+// 拦截notification组件
+const originalNotificationError = notification.error;
+notification.error = function (args) {
+  // 检查message和description是否包含我们要过滤的信息
+  const { message, description } = args;
+  if (
+    (typeof message === 'string' &&
+      (message.includes('OAuth') || message.includes('失败') || message === '')) ||
+    (typeof description === 'string' &&
+      (description.includes('OAuth') || description.includes('No specified OAuth configuration')))
+  ) {
+    console.log('已拦截notification错误:', message, description);
+    return { _dummy: true };
+  }
+  return originalNotificationError(args);
+};

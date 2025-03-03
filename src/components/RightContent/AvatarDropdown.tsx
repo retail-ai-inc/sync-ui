@@ -5,6 +5,7 @@ import {
   UserOutlined,
   LockOutlined,
   TeamOutlined,
+  SafetyOutlined,
 } from '@ant-design/icons';
 import { history, useModel } from '@umijs/max';
 import { Spin } from 'antd';
@@ -97,6 +98,11 @@ export const AvatarDropdown: React.FC<GlobalHeaderRightProps> = ({ menu, childre
       setUserManageModalVisible(true);
       return;
     }
+    // 处理系统设置菜单项点击
+    if (key === 'authSettings') {
+      history.push('/settings/auth');
+      return;
+    }
     history.push(`/account/${key}`);
   };
 
@@ -143,7 +149,7 @@ export const AvatarDropdown: React.FC<GlobalHeaderRightProps> = ({ menu, childre
           },
         ]
       : []),
-    // 只有管理员才显示修改密码和用户管理选项
+    // 只有管理员才显示修改密码、用户管理和系统设置选项
     ...(isAdmin
       ? [
           {
@@ -155,6 +161,11 @@ export const AvatarDropdown: React.FC<GlobalHeaderRightProps> = ({ menu, childre
             key: 'userManage',
             icon: <TeamOutlined />,
             label: intl.formatMessage({ id: 'menu.account.userManage' }),
+          },
+          {
+            key: 'authSettings',
+            icon: <SafetyOutlined />,
+            label: intl.formatMessage({ id: 'menu.account.authSettings' }),
           },
         ]
       : []),

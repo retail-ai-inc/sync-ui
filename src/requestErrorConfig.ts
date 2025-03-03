@@ -1,6 +1,8 @@
 ﻿import type { RequestOptions } from '@@/plugin-request/request';
 import type { RequestConfig } from '@umijs/max';
-import { message, notification } from 'antd';
+import { message } from 'antd';
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import { notification } from 'antd';
 
 // 错误处理方案： 错误类型
 enum ErrorShowType {
@@ -10,7 +12,7 @@ enum ErrorShowType {
   NOTIFICATION = 3,
   REDIRECT = 9,
 }
-// 与后端约定的响应数据格式
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 interface ResponseStructure {
   success: boolean;
   data: any;
@@ -19,68 +21,67 @@ interface ResponseStructure {
   showType?: ErrorShowType;
 }
 
+// 添加请求响应类型定义
+interface RequestResponse {
+  success: boolean;
+  data: any;
+  errorCode?: number;
+  errorMessage?: string;
+  error?: string;
+}
+
 /**
  * @name 错误处理
  * pro 自带的错误处理， 可以在这里做自己的改动
  * @doc https://umijs.org/docs/max/request#配置
  */
 export const errorConfig: RequestConfig = {
-  // 错误处理： umi@3 的错误处理方案。
+  // 错误处理: https://umijs.org/docs/max/request#配置
   errorConfig: {
     // 错误抛出
     errorThrower: (res) => {
-      const { success, data, errorCode, errorMessage, showType } =
-        res as unknown as ResponseStructure;
+      // 如果是OAuth配置未找到的错误，不抛出错误
+      if (res && res.error === 'No specified OAuth configuration found') {
+        return;
+      }
+
+      // 其他情况正常抛出错误
+      const { success, data, errorMessage } = res as unknown as RequestResponse;
       if (!success) {
         const error: any = new Error(errorMessage);
         error.name = 'BizError';
-        error.info = { errorCode, errorMessage, showType, data };
-        throw error; // 抛出自制的错误
+        error.info = { errorMessage, errorCode: data?.errorCode, errorData: data?.errorData };
+        throw error;
       }
     },
+
     // 错误接收及处理
     errorHandler: (error: any, opts: any) => {
+      // 如果是关于OAuth未配置的错误，静默处理
+      if (
+        error.response &&
+        error.response.data &&
+        error.response.data.error === 'No specified OAuth configuration found'
+      ) {
+        return { success: true, data: { enabled: false } };
+      }
+
       if (opts?.skipErrorHandler) throw error;
-      // 我们的 errorThrower 抛出的错误。
-      if (error.name === 'BizError') {
-        const errorInfo: ResponseStructure | undefined = error.info;
-        if (errorInfo) {
-          const { errorMessage, errorCode } = errorInfo;
-          switch (errorInfo.showType) {
-            case ErrorShowType.SILENT:
-              // do nothing
-              break;
-            case ErrorShowType.WARN_MESSAGE:
-              message.warning(errorMessage);
-              break;
-            case ErrorShowType.ERROR_MESSAGE:
-              message.error(errorMessage);
-              break;
-            case ErrorShowType.NOTIFICATION:
-              notification.open({
-                description: errorMessage,
-                message: errorCode,
-              });
-              break;
-            case ErrorShowType.REDIRECT:
-              // TODO: redirect
-              break;
-            default:
-              message.error(errorMessage);
-          }
-        }
-      } else if (error.response) {
+      // 我们的错误处理器
+      if (error.response) {
         // Axios 的错误
         // 请求成功发出且服务器也响应了状态码，但状态代码超出了 2xx 的范围
         message.error(`Response status:${error.response.status}`);
       } else if (error.request) {
         // 请求已经成功发起，但没有收到响应
-        // \`error.request\` 在浏览器中是 XMLHttpRequest 的实例，
-        // 而在node.js中是 http.ClientRequest 的实例
+        // error.request 在浏览器中是 XMLHttpRequest 的实例
+        // 而在node.js中是http.ClientRequest的实例
         message.error('None response! Please retry.');
       } else {
         // 发送请求时出了点问题
-        message.error('Request error, please retry.');
+        if (error.message && !error.message.includes('No specified OAuth configuration found')) {
+          message.error('Request error, please retry.');
+        }
       }
     },
   },
@@ -89,21 +90,29 @@ export const errorConfig: RequestConfig = {
   requestInterceptors: [
     (config: RequestOptions) => {
       // 拦截请求配置，进行个性化处理。
+      const url = config?.url;
+
+      // 获取token
       const token = localStorage.getItem('accessToken');
       const tokenType = localStorage.getItem('tokenType') || 'Bearer';
 
-      // 只有当token存在时才添加到请求头
+      // 如果token存在，添加到所有请求的头部
       if (token) {
-        return {
-          ...config,
-          headers: {
-            ...config.headers,
-            Authorization: `${tokenType} ${token}`,
-          },
+        config.headers = {
+          ...config.headers,
+          Authorization: `${tokenType} ${token}`,
         };
       }
 
-      return config;
+      // 如果是OAuth相关的请求，添加特定标记
+      if (url?.includes('/api/oauth') && url?.includes('/config')) {
+        config.headers = {
+          ...config.headers,
+          'X-OAuth-Request': 'true',
+        };
+      }
+
+      return { ...config };
     },
   ],
 
@@ -111,11 +120,21 @@ export const errorConfig: RequestConfig = {
   responseInterceptors: [
     (response) => {
       // 拦截响应数据，进行个性化处理
-      const { data } = response as unknown as ResponseStructure;
+      const { data } = response;
 
-      if (data?.success === false) {
-        message.error('请求失败！');
+      // 如果是OAuth请求，且返回了特定错误，转换为成功响应
+      if (
+        response.config?.headers?.['X-OAuth-Request'] === 'true' &&
+        data &&
+        !data.success &&
+        data.error === 'No specified OAuth configuration found'
+      ) {
+        response.data = {
+          success: true,
+          data: { enabled: false },
+        };
       }
+
       return response;
     },
   ],

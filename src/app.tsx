@@ -7,6 +7,7 @@ import { history } from '@umijs/max';
 import React from 'react';
 import defaultSettings from '../config/defaultSettings';
 import { errorConfig } from './requestErrorConfig';
+import { ConfigProvider, App } from 'antd';
 
 const isDev = process.env.NODE_ENV === 'development';
 const loginPath = '/user/login';
@@ -129,3 +130,36 @@ export const layout: RunTimeLayoutConfig = ({ initialState, setInitialState }) =
 export const request = {
   ...errorConfig,
 };
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const errorHandler = (error: any) => {
+  const { response } = error;
+
+  // 对于OAuth配置未找到的错误，不显示任何提示
+  if (
+    response &&
+    response.data &&
+    response.data.error === 'No specified OAuth configuration found'
+  ) {
+    // 静默返回，不显示错误
+    return { success: true, data: { enabled: false } };
+  }
+
+  // 其他错误的正常处理
+  if (response && response.status) {
+    // 处理其他HTTP错误...
+  }
+
+  return Promise.reject(error);
+};
+
+// 在应用初始化时
+export function rootContainer(container) {
+  return (
+    <ConfigProvider>
+      <App message={{ maxCount: 3 }} notification={{ maxCount: 3 }}>
+        {container}
+      </App>
+    </ConfigProvider>
+  );
+}

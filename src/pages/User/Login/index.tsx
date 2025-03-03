@@ -78,14 +78,25 @@ const Login: React.FC = () => {
   const { initialState, setInitialState } = useModel('@@initialState');
   const { styles } = useStyles();
   const intl = useIntl();
+  const [oauthEnabled, setOauthEnabled] = useState<boolean>(false);
 
   // 获取 Google OAuth 配置
   useEffect(() => {
     const loadGoogleConfig = async () => {
       try {
-        const response = await getOAuthConfig('google');
-        setGoogleConfig(response.data);
-        setGoogleConfigLoaded(true);
+        // 直接使用getOAuthConfig获取配置和状态
+        const response = await getOAuthConfig();
+        // 检查是否启用OAuth
+        const enabled =
+          response.success &&
+          (response.data.enabled !== undefined ? response.data.enabled : !!response.data.clientId);
+        setOauthEnabled(enabled);
+
+        // 如果启用了，设置配置
+        if (enabled && response.data) {
+          setGoogleConfig(response.data);
+          setGoogleConfigLoaded(true);
+        }
       } catch (error) {
         console.error('加载Google登录配置失败:', error);
         setGoogleConfigLoaded(false);
@@ -240,14 +251,14 @@ const Login: React.FC = () => {
             ></a>
           </div>
 
-          {googleConfigLoaded && (
+          {googleConfigLoaded && oauthEnabled && (
             <div style={{ marginBottom: 24, textAlign: 'center' }}>
               <Button
                 icon={<GoogleOutlined />}
                 style={{ width: '100%', marginTop: 16 }}
                 onClick={handleGoogleLogin}
               >
-                Login with Google
+                {intl.formatMessage({ id: 'pages.login.googleLogin' })}
               </Button>
             </div>
           )}

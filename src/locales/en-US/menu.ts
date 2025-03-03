@@ -53,4 +53,5 @@ export default {
   'menu.editor.koni': 'Koni Editor',
   'menu.Data Sync Tasks': 'Data Sync Tasks',
   'menu.数据同步监控': 'Data Sync Monitoring',
+  'menu.account.authSettings': 'Authentication Settings',
 };

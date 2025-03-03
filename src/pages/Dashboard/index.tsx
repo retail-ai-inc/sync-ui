@@ -1,19 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { PageContainer } from '@ant-design/pro-components';
-import {
-  Card,
-  Row,
-  Col,
-  Typography,
-  Table,
-  Tag,
-  Spin,
-  Radio,
-  Checkbox,
-  Space,
-  Alert,
-  Tooltip,
-} from 'antd';
+import { Card, Row, Col, Table, Tag, Spin, Radio, Checkbox, Space, Alert, Tooltip } from 'antd';
 import {
   ArrowRightOutlined,
   CheckCircleOutlined,
@@ -24,8 +11,25 @@ import { Line } from '@ant-design/plots';
 import { fetchSyncMetrics } from '@/services/ant-design-pro/sync';
 import styles from './index.less';
 import { useIntl } from '@umijs/max';
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const getOAuthConfig = async (provider = 'google') => {
+  try {
+    const response = await request(`/api/oauth/${provider}/config`, {
+      method: 'GET',
+      params: { provider },
+    });
 
-const { Text } = Typography;
+    // 处理特定错误
+    if (!response.success && response.error === 'No specified OAuth configuration found') {
+      return { success: true, data: { enabled: false } };
+    }
+
+    return response;
+  } catch (error) {
+    console.log('OAuth配置获取错误，视为未启用', error);
+    return { success: true, data: { enabled: false } };
+  }
+};
 
 const Dashboard: React.FC = () => {
   const intl = useIntl();
@@ -37,6 +41,8 @@ const Dashboard: React.FC = () => {
     showTarget: true,
     showDiff: true,
   });
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [showGoogleLogin, setShowGoogleLogin] = useState<boolean>(false);
 
   // 获取指标数据
   useEffect(() => {
@@ -79,7 +85,7 @@ const Dashboard: React.FC = () => {
     if (!metrics.rowCountTrend || metrics.rowCountTrend.length === 0) return [];
 
     // 根据复选框过滤数据
-    const rowCountFilteredRaw = metrics.rowCountTrend.filter((p) => {
+    const rowCountFilteredRaw = metrics.rowCountTrend.filter((p: any) => {
       if (p.type === 'source' && !displayOptions.showSource) return false;
       if (p.type === 'target' && !displayOptions.showTarget) return false;
       if (p.type === 'diff' && !displayOptions.showDiff) return false;
@@ -90,7 +96,7 @@ const Dashboard: React.FC = () => {
     const colorMap = {};
 
     // 处理数据，添加 tableType 字段用于图例显示
-    const rowCountFiltered = rowCountFilteredRaw.map((p) => {
+    const rowCountFiltered = rowCountFilteredRaw.map((p: any) => {
       if (!colorMap[p.table]) {
         colorMap[p.table] = p.table;
       }
@@ -335,6 +341,26 @@ const Dashboard: React.FC = () => {
     legend: { position: 'top' },
     height: 300,
   };
+
+  const checkOAuthConfig = async () => {
+    try {
+      // 使用我们的包装函数
+      const result = await getOAuthConfig('google');
+      if (result.success && result.data?.enabled) {
+        setShowGoogleLogin(true);
+      } else {
+        setShowGoogleLogin(false);
+      }
+    } catch (error) {
+      setShowGoogleLogin(false);
+      console.log('OAuth配置检查错误，不显示Google登录', error);
+    }
+  };
+
+  // 在组件挂载时检查OAuth配置
+  useEffect(() => {
+    checkOAuthConfig();
+  }, []);
 
   return (
     <PageContainer

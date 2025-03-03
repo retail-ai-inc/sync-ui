@@ -47,4 +47,18 @@ export default [
     layout: false,
     component: './404',
   },
+  {
+    path: '/settings',
+    name: 'settings',
+    icon: 'setting',
+    hideInMenu: true,
+    routes: [
+      {
+        path: '/settings/auth',
+        name: 'authSettings',
+        component: './Settings/AuthSettings',
+      },
+      // 可以在此添加更多设置子页面
+    ],
+  },
 ];

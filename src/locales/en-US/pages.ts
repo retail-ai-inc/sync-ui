@@ -158,4 +158,47 @@ export default {
     'Only "Table Row Count Trend" shows real data in this dashboard. Other metrics and data flows are simulated data.',
   'pages.dashboard.mockDataHint': 'Mock data for demonstration only',
   'pages.dashboard.realData': 'Real Data',
+
+  'pages.settings.auth.title': 'Authentication Settings',
+  'pages.settings.auth.enableOAuth': 'Enable {provider} Account Login',
+  'pages.settings.auth.uploadConfig': 'Upload {provider} OAuth Configuration File',
+  'pages.settings.auth.configFileHint':
+    'Please upload the OAuth client JSON configuration file from {provider}',
+  'pages.settings.auth.selectFile': 'Select File',
+  'pages.settings.auth.jsonFileOnly': 'You can only upload JSON files!',
+  'pages.settings.auth.fileSizeLimit': 'File must be smaller than 2MB!',
+  'pages.settings.auth.loading': 'Loading settings...',
+  'pages.settings.auth.save': 'Save Settings',
+  'pages.settings.auth.saveSuccess': 'Settings saved successfully',
+  'pages.settings.auth.saveFailed': 'Failed to save settings',
+  'pages.settings.auth.fetchFailed': 'Failed to fetch settings',
+  'pages.settings.auth.configHelp.title': 'Configuration Help',
+  'pages.settings.auth.configHelp.description':
+    'You need to create an OAuth client ID in {provider} and download the JSON configuration file. Make sure you have set the correct redirect URI for your application callback.',
+  'pages.settings.auth.configHelp.hint':
+    'New OAuth settings will take effect after system restart.',
+  'pages.settings.auth.currentConfig': 'Current Configuration',
+  'pages.settings.auth.clientId': 'Client ID: {id}',
+  'pages.settings.auth.redirectUri': 'Redirect URI: {uri}',
+  'pages.settings.auth.scopes': 'Authorization Scopes: {scopes}',
+  'pages.settings.auth.enableGoogleOAuth': 'Enable Google Account Login',
+  'pages.settings.auth.fileContentError':
+    'Unable to get file content, please select the file again',
+  'pages.settings.auth.jsonParseError': 'Failed to parse JSON file, please verify the file format',
+  'pages.settings.auth.fileReadError': 'Failed to read file',
+  'pages.settings.auth.missingClientId': 'Configuration file is missing client_id field',
+  'pages.settings.auth.missingClientSecret': 'Configuration file is missing client_secret field',
+  'pages.settings.auth.missingRedirectUri': 'Configuration file is missing redirect_uri field',
+  'pages.settings.auth.apiRequestFailed': 'API request failed: {message}',
+  'pages.settings.auth.configProcessError':
+    'Unknown error occurred while processing configuration file',
+  'pages.settings.auth.updateSettingsFailed': 'Failed to update settings',
+
+  'pages.login.oauthLogin': 'Login with {provider}',
+  'pages.login.googleLogin': 'Login with Google',
+  'pages.settings.auth.uploadGoogleConfig': 'Upload Google OAuth Configuration File',
+  'pages.settings.auth.googleConfigFileHint':
+    'Please upload the OAuth client JSON configuration file from Google Cloud Console',
+  'pages.settings.auth.googleConfigHelp.description':
+    'You need to create an OAuth client ID in Google Cloud Console and download the JSON configuration file. Make sure you have set the correct redirect URI for your application callback.',
 };

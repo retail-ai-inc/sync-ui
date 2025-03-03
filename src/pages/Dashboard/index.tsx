@@ -1,6 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { PageContainer } from '@ant-design/pro-components';
-import { Card, Row, Col, Table, Tag, Spin, Radio, Checkbox, Space, Alert, Tooltip } from 'antd';
+import {
+  Card,
+  Row,
+  Col,
+  Table,
+  Tag,
+  Spin,
+  Radio,
+  Checkbox,
+  Space,
+  Alert,
+  Tooltip,
+  Typography,
+} from 'antd';
 import {
   ArrowRightOutlined,
   CheckCircleOutlined,
@@ -30,6 +43,8 @@ const getOAuthConfig = async (provider = 'google') => {
     return { success: true, data: { enabled: false } };
   }
 };
+
+const { Text } = Typography;
 
 const Dashboard: React.FC = () => {
   const intl = useIntl();

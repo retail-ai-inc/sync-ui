@@ -248,4 +248,10 @@ export default {
   'pages.sync.pleaseEnterTargetHost': '请输入目标数据库主机',
   'pages.sync.pleaseEnterTargetPort': '请输入目标数据库端口',
   'pages.sync.pleaseEnterTargetDB': '请输入目标数据库名称',
+  'pages.sync.pleaseEnterSourceUsername': '请输入源数据库用户名',
+  'pages.sync.pleaseEnterSourcePassword': '请输入源数据库密码',
+  'pages.sync.pleaseEnterTargetUsername': '请输入目标数据库用户名',
+  'pages.sync.pleaseEnterTargetPassword': '请输入目标数据库密码',
+  'pages.sync.securityEnabled': '已启用',
+  'pages.sync.securityDisabled': '已禁用',
 };

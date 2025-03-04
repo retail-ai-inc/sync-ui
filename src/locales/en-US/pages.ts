@@ -269,4 +269,10 @@ export default {
   'pages.sync.pleaseEnterTargetHost': 'Please enter the target DB host',
   'pages.sync.pleaseEnterTargetPort': 'Please enter the target DB port',
   'pages.sync.pleaseEnterTargetDB': 'Please enter the target DB name',
+  'pages.sync.pleaseEnterSourceUsername': 'Please enter source username',
+  'pages.sync.pleaseEnterSourcePassword': 'Please enter source password',
+  'pages.sync.pleaseEnterTargetUsername': 'Please enter target username',
+  'pages.sync.pleaseEnterTargetPassword': 'Please enter target password',
+  'pages.sync.securityEnabled': 'Enabled',
+  'pages.sync.securityDisabled': 'Disabled',
 };

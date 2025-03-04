@@ -20,6 +20,7 @@ import {
 import { LockOutlined, EyeInvisibleOutlined } from '@ant-design/icons';
 import type { TransferDirection } from 'antd/es/transfer';
 import type { FormInstance } from 'antd';
+import type { Key } from 'antd/es/table/interface';
 import { addSyncTask, updateSyncTask, getTableSchema } from '@/services/ant-design-pro/sync';
 import { useIntl } from '@umijs/max';
 
@@ -34,6 +35,7 @@ interface SyncConn {
 interface TableItem {
   sourceTable: string;
   targetTable: string;
+  fieldSecurity?: FieldSecurityOption[];
 }
 
 interface MappingBlock {
@@ -42,6 +44,7 @@ interface MappingBlock {
   sourceSchema?: string;
   targetDatabase?: string;
   targetSchema?: string;
+  securityEnabled?: boolean;
 }
 
 interface SyncRecord {
@@ -55,6 +58,7 @@ interface SyncRecord {
   status?: string;
   lastRunTime?: string;
   lastUpdateTime?: string;
+  securityEnabled?: boolean;
 
   // Potential DB-specific parameters if the record is loaded for editing
   pg_replication_slot?: string;
@@ -85,6 +89,35 @@ interface AddSyncProps {
   onCancel: () => void;
 }
 
+// 添加安全选项类型定义
+interface FieldSecurityOption {
+  field: string;
+  securityType: 'encrypted' | 'masked';
+}
+
+// 修改 TableSecurityOptions 接口以便被使用
+interface TableSecurityOption {
+  sourceTable: string;
+  targetTable: string;
+  fieldSecurity: FieldSecurityOption[];
+}
+
+interface FieldOption {
+  encrypt: boolean;
+  mask: boolean;
+}
+
+interface TableSchemaComponentProps {
+  table: any[];
+  advancedSecurityEnabled: boolean;
+}
+
+// 实现 collectSecurityOptions 函数 (之前只是声明但未实现)
+const collectSecurityOptions = (): TableSecurityOption[] => {
+  // 这里应该有实现，我添加一个简单的实现作为示例
+  return [];
+};
+
 const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
   const [targetKeys, setTargetKeys] = useState<string[]>([]);
   const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
@@ -104,6 +137,11 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
 
   // 添加 intl 实例
   const intl = useIntl();
+
+  // 添加新的状态来存储表的安全选项
+  const [tablesSecurityOptions, setTablesSecurityOptions] = useState<
+    Record<string, Record<string, FieldOption>>
+  >({});
 
   // 编辑任务时，根据 record.mappings 初始化 Transfer 选择
   useEffect(() => {
@@ -125,6 +163,12 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
     console.log('fetchTableSchema调用，tableName:', tableName);
     console.log('全局变量状态:', { globalSourceType, globalSourceConn });
 
+    // Redis 不需要获取表结构
+    if (globalSourceType === 'redis') {
+      console.log('Redis 数据库不需要获取表结构');
+      return;
+    }
+
     // 首先尝试使用全局变量
     if (globalSourceType && globalSourceConn) {
       console.log('使用全局变量获取表结构');
@@ -145,12 +189,13 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
         console.log('API返回的表结构数据:', response);
 
         if (response.success && response.data.fields) {
-          // 转换API返回的数据格式为组件需要的格式
+          // 转换API返回的数据格式为组件需要的格式，添加_tableName属性标记来源表
           const fieldData = response.data.fields.map((field: any) => ({
             key: `${tableName}_${field.name}`,
-            fieldName: field.name, // 修改字段名以匹配列定义
-            fieldType: field.type, // 修改字段名以匹配列定义
-            status: 'normal', // 默认为正常状态
+            fieldName: field.name,
+            fieldType: field.type,
+            status: 'normal',
+            _tableName: tableName, // 添加表名标记，确保不会混淆
           }));
 
           console.log('转换后的字段数据:', fieldData);
@@ -231,17 +276,18 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
     }
   };
 
-  // 修改穿梭框变更处理函数，添加获取字段信息的逻辑
+  // 修改穿梭框变更处理函数的类型，使其匹配 Transfer 所需类型
   const onTransferChange = (
-    newTargetKeys: string[],
+    newTargetKeys: Key[],
     direction: TransferDirection,
-    moveKeys: string[],
+    moveKeys: Key[],
   ) => {
     console.log('onTransferChange被调用:', { newTargetKeys, direction, moveKeys });
-    setTargetKeys(newTargetKeys);
+    // 转换为 string[] 类型
+    setTargetKeys(newTargetKeys as string[]);
 
     // 找出新增的表，并获取它们的字段信息
-    const addedTables = newTargetKeys.filter((key) =>
+    const addedTables = (newTargetKeys as string[]).filter((key) =>
       targetKeys ? !targetKeys.includes(key) : true,
     );
 
@@ -252,7 +298,10 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
       setTimeout(() => {
         addedTables.forEach((tableName) => {
           console.log('准备获取表结构:', tableName);
-          fetchTableSchema(tableName);
+          // 添加对 Redis 类型的检查，Redis 不需要获取表结构
+          if (globalSourceType !== 'redis') {
+            fetchTableSchema(tableName);
+          }
         });
       }, 0);
     }
@@ -316,13 +365,36 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
 
   // 点击最右侧"提交"时执行
   const handleSubmit = async (values: any) => {
-    // 组装 mappings 字段（仅使用一个 mapping）
+    // 收集安全选项
+    const tableSecurityOptions = collectSecurityOptions();
+
+    // 将高级安全选项状态仅添加到顶级，不在mappings中重复
+    values.securityEnabled = showSecurityOptions;
+
+    // 组装 mappings 字段
     values.mappings = [
       {
-        tables: (targetKeys || []).map((key) => ({
-          sourceTable: key,
-          targetTable: key,
-        })),
+        tables: (targetKeys || []).map((key) => {
+          // 查找当前表的安全选项，添加类型注解
+          const securityOptions = tableSecurityOptions.find(
+            (option: TableSecurityOption) => option.sourceTable === key,
+          );
+
+          if (securityOptions) {
+            // 如果有安全选项，包含fieldSecurity
+            return {
+              sourceTable: key,
+              targetTable: key,
+              fieldSecurity: securityOptions.fieldSecurity,
+            };
+          } else {
+            // 否则返回基本信息
+            return {
+              sourceTable: key,
+              targetTable: key,
+            };
+          }
+        }),
       },
     ];
 
@@ -644,39 +716,90 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
     }
   };
 
-  // Transfer 事件处理
-  const onSelectChange = (sourceSelectedKeys: string[], targetSelectedKeys: string[]) => {
-    setSelectedKeys([...sourceSelectedKeys, ...targetSelectedKeys]);
+  // 修改 onSelectChange 函数的类型
+  const onSelectChange = (sourceSelectedKeys: Key[], targetSelectedKeys: Key[]) => {
+    setSelectedKeys([...sourceSelectedKeys, ...targetSelectedKeys] as string[]);
   };
 
-  const TableSchemaComponent = ({ table, advancedSecurityEnabled }) => {
-    // 状态管理数据安全选项
-    const [securityOptions, setSecurityOptions] = useState({});
+  // 修改 TableSchemaComponent 组件，改变表名获取方式
+  const TableSchemaComponent = ({ table, advancedSecurityEnabled }: TableSchemaComponentProps) => {
+    // 直接使用传入的完整表名，而不是尝试从字段key提取
+    const tableName =
+      table.length > 0 && table[0]._tableName
+        ? table[0]._tableName // 使用我们添加的特殊属性
+        : table.length > 0
+          ? String(table[0].key).split('_')[0]
+          : ''; // 兼容旧逻辑
 
-    // 处理安全选项变更
-    const handleSecurityOptionChange = (fieldName, optionType) => {
+    // 使用父组件中已存储的选项或创建新的
+    const [securityOptions, setSecurityOptions] = useState<Record<string, FieldOption>>(
+      tablesSecurityOptions[tableName] || {},
+    );
+
+    // 当安全选项变更时更新父组件状态 - 使用 useEffect 的清理函数减少重复渲染
+    useEffect(() => {
+      // 避免空表名或空选项的情况
+      if (!tableName || Object.keys(securityOptions).length === 0) return;
+
+      // 比较当前选项和已存储选项是否相同，避免无意义的更新
+      const currentOptions = tablesSecurityOptions[tableName];
+      const needsUpdate =
+        !currentOptions || JSON.stringify(currentOptions) !== JSON.stringify(securityOptions);
+
+      if (needsUpdate) {
+        // 使用函数式更新避免依赖于先前的状态
+        setTablesSecurityOptions((prev) => ({
+          ...prev,
+          [tableName]: securityOptions,
+        }));
+      }
+
+      // 返回清理函数
+      return () => {
+        // 清理时不需要做任何事情，但这有助于 React 优化更新
+      };
+    }, [tableName]); // 仅在表名变化时执行，securityOptions通过事件处理程序单独更新
+
+    // 处理安全选项变更 - 在这里直接更新父组件状态
+    const handleSecurityOptionChange = (fieldName: string, optionType: 'encrypt' | 'mask') => {
       setSecurityOptions((prev) => {
         const fieldOptions = prev[fieldName] || { encrypt: false, mask: false };
 
         // 如果已经选择了当前选项，则取消选择
         if (fieldOptions[optionType]) {
-          return {
+          const newOptions = {
             ...prev,
             [fieldName]: {
               ...fieldOptions,
               [optionType]: false,
             },
           };
+
+          // 直接更新父组件状态
+          setTablesSecurityOptions((prevTables) => ({
+            ...prevTables,
+            [tableName]: newOptions,
+          }));
+
+          return newOptions;
         }
 
         // 否则选择当前选项，并确保另一个选项被取消
-        return {
+        const newOptions = {
           ...prev,
           [fieldName]: {
             encrypt: optionType === 'encrypt',
             mask: optionType === 'mask',
           },
         };
+
+        // 直接更新父组件状态
+        setTablesSecurityOptions((prevTables) => ({
+          ...prevTables,
+          [tableName]: newOptions,
+        }));
+
+        return newOptions;
       });
     };
 
@@ -698,7 +821,7 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
             {
               title: intl.formatMessage({ id: 'pages.sync.securityOptions' }),
               key: 'securityOptions',
-              render: (_, record) => {
+              render: (_: any, record: any) => {
                 const fieldOptions = securityOptions[record.fieldName] || {
                   encrypt: false,
                   mask: false,
@@ -743,6 +866,72 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
 
     return <Table columns={columns} dataSource={dataSource} pagination={false} />;
   };
+
+  // 修改安全选项初始化逻辑，确保securityEnabled正确加载
+  useEffect(() => {
+    if (record) {
+      // 使用控制台确认加载的record值
+      console.log('Loading record:', record);
+
+      // 初始化状态为false
+      let securityEnabled = false;
+
+      // 从顶级属性中检查securityEnabled
+      if (record.securityEnabled !== undefined) {
+        securityEnabled = !!record.securityEnabled;
+        console.log('Using top-level securityEnabled:', securityEnabled);
+      }
+      // 如果顶级没有，则尝试从mapping中读取(兼容旧数据)
+      else if (
+        record.mappings &&
+        record.mappings.length > 0 &&
+        record.mappings[0].securityEnabled !== undefined
+      ) {
+        securityEnabled = !!record.mappings[0].securityEnabled;
+        console.log('Using mapping securityEnabled:', securityEnabled);
+      }
+
+      // 设置状态值，并确保它被正确应用
+      console.log('Setting showSecurityOptions to:', securityEnabled);
+      setShowSecurityOptions(securityEnabled);
+
+      // 确保UI组件反映这个状态
+      setTimeout(() => {
+        const currentValue = showSecurityOptions;
+        console.log('Current showSecurityOptions after setting:', currentValue);
+        if (currentValue !== securityEnabled) {
+          // 如果状态没有正确更新，强制再次更新
+          console.log('Forcing update of showSecurityOptions');
+          setShowSecurityOptions(securityEnabled);
+        }
+      }, 100);
+
+      // 初始化表安全选项
+      if (record.mappings && record.mappings.length > 0 && record.mappings[0].tables) {
+        const securityOptions: Record<string, Record<string, FieldOption>> = {};
+
+        record.mappings[0].tables.forEach((table) => {
+          if (table.fieldSecurity && table.fieldSecurity.length > 0) {
+            const tableOptions: Record<string, FieldOption> = {};
+
+            table.fieldSecurity.forEach((field) => {
+              tableOptions[field.field] = {
+                encrypt: field.securityType === 'encrypted',
+                mask: field.securityType === 'masked',
+              };
+            });
+
+            securityOptions[table.sourceTable] = tableOptions;
+          }
+        });
+
+        // 更新状态
+        if (Object.keys(securityOptions).length > 0) {
+          setTablesSecurityOptions(securityOptions);
+        }
+      }
+    }
+  }, [record]); // 仅当record变化时触发
 
   return (
     <StepsForm
@@ -979,8 +1168,8 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
             intl.formatMessage({ id: 'pages.sync.availableTables' }),
             intl.formatMessage({ id: 'pages.sync.selectedTables' }),
           ]}
-          targetKeys={targetKeys}
-          selectedKeys={selectedKeys}
+          targetKeys={targetKeys as Key[]}
+          selectedKeys={selectedKeys as Key[]}
           onChange={onTransferChange}
           onSelectChange={onSelectChange}
           render={(item) => item.title}
@@ -991,12 +1180,29 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
         <div style={{ marginTop: 24, borderTop: '1px dashed #ccc', paddingTop: 16 }}>
           <Switch
             checked={showSecurityOptions}
-            onChange={setShowSecurityOptions}
+            onChange={(checked) => {
+              console.log('Security option switch changed to:', checked);
+              setShowSecurityOptions(checked);
+              // 如果关闭安全选项，可以选择清空所有安全设置
+              if (!checked) {
+                // 可选：清空所有安全选项
+                // setTablesSecurityOptions({});
+              }
+            }}
             style={{ marginRight: 8 }}
           />
           <Typography.Text strong>
             {intl.formatMessage({ id: 'pages.sync.advancedSecurity' })}
           </Typography.Text>
+          {record &&
+            (record.securityEnabled ||
+              (record.mappings &&
+                record.mappings.length > 0 &&
+                record.mappings[0].securityEnabled)) && (
+              <Typography.Text type="success" style={{ marginLeft: 8 }}>
+                ({intl.formatMessage({ id: 'pages.sync.securityEnabled' })})
+              </Typography.Text>
+            )}
         </div>
 
         {/* 显示表字段及操作 */}

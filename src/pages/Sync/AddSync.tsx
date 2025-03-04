@@ -14,13 +14,13 @@ import {
   Switch,
   Table,
   Typography,
-  Tag,
   Collapse,
+  Spin,
 } from 'antd';
-import { LockOutlined, EyeInvisibleOutlined, UndoOutlined } from '@ant-design/icons';
-import type { TransferProps } from 'antd';
+import { LockOutlined, EyeInvisibleOutlined } from '@ant-design/icons';
+import type { TransferDirection } from 'antd/es/transfer';
 import type { FormInstance } from 'antd';
-import { addSyncTask, updateSyncTask } from '@/services/ant-design-pro/sync';
+import { addSyncTask, updateSyncTask, getTableSchema } from '@/services/ant-design-pro/sync';
 import { useIntl } from '@umijs/max';
 
 interface SyncConn {
@@ -68,6 +68,7 @@ interface SyncRecord {
 
 // 全局变量来储存 sourceType
 let globalSourceType = '';
+let globalSourceConn: SyncConn | null = null;
 
 // 工具方法：生成当前时间字符串 "YYYY-MM-DD HH:mm:ss"
 const getCurrentTimeString = () => {
@@ -85,155 +86,24 @@ interface AddSyncProps {
 }
 
 const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
-  const [targetKeys, setTargetKeys] = useState<TransferProps['targetKeys']>([]);
-  const [selectedKeys, setSelectedKeys] = useState<TransferProps['selectedKeys']>([]);
+  const [targetKeys, setTargetKeys] = useState<string[]>([]);
+  const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
   // 后端返回的真实表数据（第四步需要的表列表）
   const [tableData, setTableData] = useState<{ key: string; title: string; description: string }[]>(
     [],
   );
   const [showSecurityOptions, setShowSecurityOptions] = useState(false);
   const formRef = useRef<FormInstance>();
+  const [fieldsMockData, setFieldsMockData] = useState<Record<string, any[]>>({});
+  const [isLoadingFields, setIsLoadingFields] = useState(false);
+  const [currentStep, setCurrentStep] = useState(0);
+  const [sourceConnectionInfo, setSourceConnectionInfo] = useState<{
+    sourceType: string;
+    sourceConn: SyncConn;
+  } | null>(null);
 
   // 添加 intl 实例
   const intl = useIntl();
-
-  // 将 fieldsMockData 改为普通状态变量，以支持更新
-  const [fieldsMockData, setFieldsMockData] = useState({
-    users: [
-      { key: 'users_id', name: 'id', type: 'int', status: 'normal' },
-      { key: 'users_name', name: 'name', type: 'varchar', status: 'masked' },
-      { key: 'users_email', name: 'email', type: 'varchar', status: 'encrypted' },
-      { key: 'users_password', name: 'password', type: 'varchar', status: 'encrypted' },
-      { key: 'users_address', name: 'address', type: 'varchar', status: 'normal' },
-      { key: 'users_phone', name: 'phone', type: 'varchar', status: 'masked' },
-    ],
-    orders: [
-      { key: 'orders_id', name: 'id', type: 'int', status: 'normal' },
-      { key: 'orders_user_id', name: 'user_id', type: 'int', status: 'normal' },
-      { key: 'orders_amount', name: 'amount', type: 'decimal', status: 'normal' },
-      { key: 'orders_card_number', name: 'card_number', type: 'varchar', status: 'masked' },
-      { key: 'orders_cvv', name: 'cvv', type: 'varchar', status: 'encrypted' },
-    ],
-  });
-
-  // 修改处理字段状态修改的函数，实际更新状态
-  const handleFieldStatusChange = (table: string, fieldKey: string, newStatus: string) => {
-    // 创建一个深拷贝以避免直接修改状态
-    const updatedData = JSON.parse(JSON.stringify(fieldsMockData));
-
-    // 找到对应的表和字段并更新其状态
-    if (updatedData[table]) {
-      const fieldIndex = updatedData[table].findIndex((field: any) => field.key === fieldKey);
-      if (fieldIndex !== -1) {
-        const statusMap: { [key: string]: string } = {
-          [intl.formatMessage({ id: 'pages.syncSettings.status.masked' })]: 'masked',
-          [intl.formatMessage({ id: 'pages.syncSettings.status.encrypted' })]: 'encrypted',
-          [intl.formatMessage({ id: 'pages.syncSettings.status.normal' })]: 'normal',
-        };
-
-        updatedData[table][fieldIndex].status = statusMap[newStatus] || 'normal';
-
-        // 更新状态
-        setFieldsMockData(updatedData);
-        message.success(
-          intl.formatMessage(
-            { id: 'pages.syncSettings.message.fieldStatusChanged' },
-            {
-              table: table,
-              field: fieldKey.split('_')[1],
-              status: newStatus,
-            },
-          ),
-        );
-      }
-    }
-  };
-
-  // 定义字段表格列
-  const fieldsColumns = [
-    {
-      title: intl.formatMessage({ id: 'pages.syncSettings.fieldName' }),
-      dataIndex: 'name',
-      key: 'name',
-    },
-    {
-      title: intl.formatMessage({ id: 'pages.syncSettings.fieldType' }),
-      dataIndex: 'type',
-      key: 'type',
-    },
-    {
-      title: intl.formatMessage({ id: 'pages.syncSettings.fieldStatus' }),
-      dataIndex: 'status',
-      key: 'status',
-      render: (status: string) => {
-        let color = 'green';
-        let text = intl.formatMessage({ id: 'pages.syncSettings.status.normal' });
-
-        if (status === 'masked') {
-          color = 'orange';
-          text = intl.formatMessage({ id: 'pages.syncSettings.status.masked' });
-        } else if (status === 'encrypted') {
-          color = 'red';
-          text = intl.formatMessage({ id: 'pages.syncSettings.status.encrypted' });
-        }
-
-        return <Tag color={color}>{text}</Tag>;
-      },
-    },
-    {
-      title: intl.formatMessage({ id: 'pages.syncSettings.operation' }),
-      key: 'action',
-      render: (_, record: any) => {
-        const tableName = record.key.split('_')[0];
-        return (
-          <Space>
-            <Button
-              icon={<EyeInvisibleOutlined />}
-              size="small"
-              onClick={() =>
-                handleFieldStatusChange(
-                  tableName,
-                  record.key,
-                  intl.formatMessage({ id: 'pages.syncSettings.status.masked' }),
-                )
-              }
-              disabled={record.status === 'masked'}
-            >
-              {intl.formatMessage({ id: 'pages.syncSettings.action.mask' })}
-            </Button>
-            <Button
-              icon={<LockOutlined />}
-              size="small"
-              onClick={() =>
-                handleFieldStatusChange(
-                  tableName,
-                  record.key,
-                  intl.formatMessage({ id: 'pages.syncSettings.status.encrypted' }),
-                )
-              }
-              disabled={record.status === 'encrypted'}
-            >
-              {intl.formatMessage({ id: 'pages.syncSettings.action.encrypt' })}
-            </Button>
-            <Button
-              icon={<UndoOutlined />}
-              size="small"
-              onClick={() =>
-                handleFieldStatusChange(
-                  tableName,
-                  record.key,
-                  intl.formatMessage({ id: 'pages.syncSettings.status.normal' }),
-                )
-              }
-              disabled={record.status === 'normal'}
-            >
-              {intl.formatMessage({ id: 'pages.syncSettings.action.restore' })}
-            </Button>
-          </Space>
-        );
-      },
-    },
-  ];
 
   // 编辑任务时，根据 record.mappings 初始化 Transfer 选择
   useEffect(() => {
@@ -250,12 +120,206 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
     }
   }, [record]);
 
+  // 获取表结构信息的函数
+  const fetchTableSchema = async (tableName: string) => {
+    console.log('fetchTableSchema调用，tableName:', tableName);
+    console.log('全局变量状态:', { globalSourceType, globalSourceConn });
+
+    // 首先尝试使用全局变量
+    if (globalSourceType && globalSourceConn) {
+      console.log('使用全局变量获取表结构');
+      setIsLoadingFields(true);
+      try {
+        const response = await getTableSchema({
+          sourceType: globalSourceType,
+          connection: {
+            host: globalSourceConn.host || '',
+            port: globalSourceConn.port || '',
+            user: globalSourceConn.user || '',
+            password: globalSourceConn.password || '',
+            database: globalSourceConn.database || '',
+          },
+          tableName,
+        });
+
+        console.log('API返回的表结构数据:', response);
+
+        if (response.success && response.data.fields) {
+          // 转换API返回的数据格式为组件需要的格式
+          const fieldData = response.data.fields.map((field: any) => ({
+            key: `${tableName}_${field.name}`,
+            fieldName: field.name, // 修改字段名以匹配列定义
+            fieldType: field.type, // 修改字段名以匹配列定义
+            status: 'normal', // 默认为正常状态
+          }));
+
+          console.log('转换后的字段数据:', fieldData);
+
+          setFieldsMockData((prev) => {
+            const newData = {
+              ...prev,
+              [tableName]: fieldData,
+            };
+            console.log('更新后的fieldsMockData:', newData);
+            return newData;
+          });
+        } else {
+          console.error('API返回错误或无字段数据:', response);
+          message.error(intl.formatMessage({ id: 'pages.syncSettings.fetchFieldsFailed' }));
+        }
+      } catch (error) {
+        console.error('获取表结构出错:', error);
+        message.error(intl.formatMessage({ id: 'pages.syncSettings.fetchFieldsFailed' }));
+      } finally {
+        setIsLoadingFields(false);
+      }
+    } else if (sourceConnectionInfo) {
+      // 如果全局变量不可用，尝试使用state
+      console.log('使用state获取表结构');
+      const { sourceType, sourceConn } = sourceConnectionInfo;
+
+      if (
+        !sourceType ||
+        !sourceConn ||
+        !sourceConn.host ||
+        !sourceConn.port ||
+        !sourceConn.database
+      ) {
+        message.error(intl.formatMessage({ id: 'pages.syncSettings.missingConnectionInfo' }));
+        return;
+      }
+
+      setIsLoadingFields(true);
+      try {
+        const response = await getTableSchema({
+          sourceType,
+          connection: {
+            host: sourceConn.host,
+            port: sourceConn.port,
+            user: sourceConn.user || '',
+            password: sourceConn.password || '',
+            database: sourceConn.database,
+          },
+          tableName,
+        });
+
+        if (response.success && response.data.fields) {
+          // 转换API返回的数据格式为组件需要的格式
+          const fieldData = response.data.fields.map((field: any) => ({
+            key: `${tableName}_${field.name}`,
+            name: field.name,
+            type: field.type,
+            status: 'normal', // 默认为正常状态
+          }));
+
+          setFieldsMockData((prev) => ({
+            ...prev,
+            [tableName]: fieldData,
+          }));
+        } else {
+          message.error(intl.formatMessage({ id: 'pages.syncSettings.fetchFieldsFailed' }));
+        }
+      } catch (error) {
+        console.error('获取表结构出错:', error);
+        message.error(intl.formatMessage({ id: 'pages.syncSettings.fetchFieldsFailed' }));
+      } finally {
+        setIsLoadingFields(false);
+      }
+    } else {
+      console.error('无法获取连接信息');
+      message.error(intl.formatMessage({ id: 'pages.syncSettings.missingConnectionInfo' }));
+    }
+  };
+
+  // 修改穿梭框变更处理函数，添加获取字段信息的逻辑
+  const onTransferChange = (
+    newTargetKeys: string[],
+    direction: TransferDirection,
+    moveKeys: string[],
+  ) => {
+    console.log('onTransferChange被调用:', { newTargetKeys, direction, moveKeys });
+    setTargetKeys(newTargetKeys);
+
+    // 找出新增的表，并获取它们的字段信息
+    const addedTables = newTargetKeys.filter((key) =>
+      targetKeys ? !targetKeys.includes(key) : true,
+    );
+
+    console.log('新增表:', addedTables, '当前已选表:', targetKeys);
+
+    if (addedTables.length > 0) {
+      // 使用setTimeout确保表单值已更新
+      setTimeout(() => {
+        addedTables.forEach((tableName) => {
+          console.log('准备获取表结构:', tableName);
+          fetchTableSchema(tableName);
+        });
+      }, 0);
+    }
+  };
+
+  // 使用step name来确定当前步骤，而不是依赖索引
+  useEffect(() => {
+    // 检查当前是否处于表映射步骤
+    if (currentStep === 3) {
+      // 假设第4步索引为3
+      console.log('进入第4步, 状态检查:');
+      console.log('全局变量:', { globalSourceType, globalSourceConn });
+      console.log('targetKeys:', targetKeys);
+      console.log('tableData:', tableData);
+
+      // 如果没有表数据但有连接信息，尝试加载表数据
+      if (tableData.length === 0 && globalSourceType && globalSourceConn) {
+        console.log('尝试加载表数据');
+        const payload = {
+          dbType: globalSourceType,
+          host: globalSourceConn.host,
+          port: globalSourceConn.port,
+          user: globalSourceConn.user || '',
+          password: globalSourceConn.password || '',
+          database: globalSourceConn.database,
+        };
+
+        fetch('/api/test-connection', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        })
+          .then((res) => res.json())
+          .then((result) => {
+            if (result.success) {
+              const tables: string[] = result.data.tables;
+              const newTableData = tables.map((table) => ({
+                key: table,
+                title: table,
+                description: `table ${table}`,
+              }));
+              setTableData(newTableData);
+            }
+          })
+          .catch((error) => {
+            console.error('加载表数据失败:', error);
+          });
+      }
+
+      // 如果有选中的表，加载字段信息
+      if (targetKeys && targetKeys.length > 0) {
+        targetKeys.forEach((tableName) => {
+          if (!fieldsMockData[tableName]) {
+            console.log('准备获取表字段:', tableName);
+            fetchTableSchema(tableName);
+          }
+        });
+      }
+    }
+  }, [currentStep]);
+
   // 点击最右侧"提交"时执行
   const handleSubmit = async (values: any) => {
     // 组装 mappings 字段（仅使用一个 mapping）
     values.mappings = [
       {
-        tables: targetKeys.map((key) => ({
+        tables: (targetKeys || []).map((key) => ({
           sourceTable: key,
           targetTable: key,
         })),
@@ -350,10 +414,18 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
     }
 
     if (res.success) {
-      message.success(record && record.id ? 'Update success' : 'Add success');
+      message.success(
+        record && record.id
+          ? intl.formatMessage({ id: 'pages.sync.updateSucesss' })
+          : intl.formatMessage({ id: 'pages.sync.addSucesss' }),
+      );
       onSuccess();
     } else {
-      message.error(record && record.id ? 'Update failed' : 'Add failed');
+      message.error(
+        record && record.id
+          ? intl.formatMessage({ id: 'pages.sync.updateFailed' })
+          : intl.formatMessage({ id: 'pages.sync.addFailed' }),
+      );
     }
   };
 
@@ -362,12 +434,12 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
     const values = formRef.current?.getFieldsValue(true);
     const dbType = globalSourceType;
     if (!dbType) {
-      message.error('Please select a Source Type.');
+      message.error(intl.formatMessage({ id: 'pages.sync.selectSourceType' }));
       return;
     }
     const sourceConn = values?.sourceConn;
     if (!sourceConn || !sourceConn.host || !sourceConn.port || !sourceConn.database) {
-      message.error('Please complete the source connection information.');
+      message.error(intl.formatMessage({ id: 'pages.sync.completeSourceConn' }));
       return;
     }
     const payload = {
@@ -386,7 +458,7 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
       });
       const result = await res.json();
       if (res.ok && result.success) {
-        message.success('Source DB connection successful.');
+        message.success(intl.formatMessage({ id: 'pages.sync.sourceConnSuccess' }));
         const tables: string[] = result.data.tables;
         const newTableData = tables.map((table) => ({
           key: table,
@@ -395,10 +467,14 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
         }));
         setTableData(newTableData);
       } else {
-        message.error(result.error || 'Source DB connection failed.');
+        message.error(
+          intl.formatMessage({ id: 'pages.sync.sourceConnFailed' }) +
+            ': ' +
+            (result.error || 'Source DB connection failed.'),
+        );
       }
     } catch (error: any) {
-      message.error('Error testing connection: ' + error.message);
+      message.error(intl.formatMessage({ id: 'pages.sync.testConnError' }) + ': ' + error.message);
     }
   };
 
@@ -407,12 +483,12 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
     const values = formRef.current?.getFieldsValue(true);
     const dbType = globalSourceType;
     if (!dbType) {
-      message.error('Please select a Source Type.');
+      message.error(intl.formatMessage({ id: 'pages.sync.selectSourceType' }));
       return;
     }
     const targetConn = values?.targetConn;
     if (!targetConn || !targetConn.host || !targetConn.port || !targetConn.database) {
-      message.error('Please complete the target connection information.');
+      message.error(intl.formatMessage({ id: 'pages.sync.completeTargetConn' }));
       return;
     }
     const payload = {
@@ -431,7 +507,7 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
       });
       const result = await res.json();
       if (res.ok && result.success) {
-        message.success('Target DB connection successful.');
+        message.success(intl.formatMessage({ id: 'pages.sync.targetConnSuccess' }));
         // const tables: string[] = result.data.tables;
         // const newTableData = tables.map((table) => ({
         //   key: table,
@@ -440,10 +516,14 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
         // }));
         // setTableData(newTableData);
       } else {
-        message.error(result.error || 'Target DB connection failed.');
+        message.error(
+          intl.formatMessage({ id: 'pages.sync.targetConnFailed' }) +
+            ': ' +
+            (result.error || 'Target DB connection failed.'),
+        );
       }
     } catch (error: any) {
-      message.error('Error testing connection: ' + error.message);
+      message.error(intl.formatMessage({ id: 'pages.sync.testConnError' }) + ': ' + error.message);
     }
   };
 
@@ -453,15 +533,22 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
     const dbType = globalSourceType;
 
     if (!dbType) {
-      message.error('Please select a Source Type in Step 1');
+      message.error(intl.formatMessage({ id: 'pages.sync.selectSourceType' }));
       return false;
     }
 
     const sourceConn = values?.sourceConn;
     if (!sourceConn || !sourceConn.host || !sourceConn.port || !sourceConn.database) {
-      message.error('Please complete the source connection information in Step 2');
+      message.error(intl.formatMessage({ id: 'pages.sync.completeSourceConn' }));
       return false;
     }
+
+    // 保存到全局变量和state
+    globalSourceConn = sourceConn;
+    setSourceConnectionInfo({
+      sourceType: globalSourceType,
+      sourceConn: sourceConn,
+    });
 
     const payload = {
       dbType,
@@ -471,6 +558,7 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
       password: sourceConn.password || '',
       database: sourceConn.database,
     };
+
     try {
       const res = await fetch('/api/test-connection', {
         method: 'POST',
@@ -479,7 +567,7 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
       });
       const result = await res.json();
       if (res.ok && result.success) {
-        message.success('Source DB connection successful (auto load).');
+        message.success(intl.formatMessage({ id: 'pages.sync.sourceConnAutoSuccess' }));
         const tables: string[] = result.data.tables;
         const newTableData = tables.map((table) => ({
           key: table,
@@ -489,11 +577,15 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
         setTableData(newTableData);
         return true;
       } else {
-        message.error(result.error || 'Source DB connection failed (auto load).');
+        message.error(
+          intl.formatMessage({ id: 'pages.sync.sourceConnAutoFailed' }) +
+            ': ' +
+            (result.error || 'Source DB connection failed (auto load).'),
+        );
         return false;
       }
     } catch (error: any) {
-      message.error('Error testing connection: ' + error.message);
+      message.error(intl.formatMessage({ id: 'pages.sync.testConnError' }) + ': ' + error.message);
       return false;
     }
   };
@@ -503,13 +595,13 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
     const dbType = globalSourceType;
 
     if (!dbType) {
-      message.error('Please select a Source Type in Step 1');
+      message.error(intl.formatMessage({ id: 'pages.sync.selectSourceType' }));
       return false;
     }
 
     const targetConn = values?.targetConn;
     if (!targetConn || !targetConn.host || !targetConn.port || !targetConn.database) {
-      message.error('Please complete the target connection information in Step 3');
+      message.error(intl.formatMessage({ id: 'pages.sync.completeTargetConn' }));
       return false;
     }
 
@@ -530,40 +622,141 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
       });
       const result = await res.json();
       if (res.ok && result.success) {
-        message.success('Target DB connection successful (auto load).');
-        // const _tables: string[] = result.data.tables;
+        message.success(intl.formatMessage({ id: 'pages.sync.targetConnAutoSuccess' }));
+        // 成功后保存源连接信息
+        const formValues = formRef.current?.getFieldsValue(true);
+        setSourceConnectionInfo({
+          sourceType: formValues?.sourceType,
+          sourceConn: formValues?.sourceConn,
+        });
         return true;
       } else {
-        message.error(result.error || 'Target DB connection failed (auto load).');
+        message.error(
+          intl.formatMessage({ id: 'pages.sync.targetConnAutoFailed' }) +
+            ': ' +
+            (result.error || 'Target DB connection failed (auto load).'),
+        );
         return false;
       }
     } catch (error: any) {
-      message.error('Error testing connection: ' + error.message);
+      message.error(intl.formatMessage({ id: 'pages.sync.testConnError' }) + ': ' + error.message);
       return false;
     }
   };
 
   // Transfer 事件处理
-  const onTransferChange: TransferProps['onChange'] = (nextTargetKeys) => {
-    setTargetKeys(nextTargetKeys);
-  };
-  const onSelectChange: TransferProps['onSelectChange'] = (
-    sourceSelectedKeys,
-    targetSelectedKeys,
-  ) => {
+  const onSelectChange = (sourceSelectedKeys: string[], targetSelectedKeys: string[]) => {
     setSelectedKeys([...sourceSelectedKeys, ...targetSelectedKeys]);
+  };
+
+  const TableSchemaComponent = ({ table, advancedSecurityEnabled }) => {
+    // 状态管理数据安全选项
+    const [securityOptions, setSecurityOptions] = useState({});
+
+    // 处理安全选项变更
+    const handleSecurityOptionChange = (fieldName, optionType) => {
+      setSecurityOptions((prev) => {
+        const fieldOptions = prev[fieldName] || { encrypt: false, mask: false };
+
+        // 如果已经选择了当前选项，则取消选择
+        if (fieldOptions[optionType]) {
+          return {
+            ...prev,
+            [fieldName]: {
+              ...fieldOptions,
+              [optionType]: false,
+            },
+          };
+        }
+
+        // 否则选择当前选项，并确保另一个选项被取消
+        return {
+          ...prev,
+          [fieldName]: {
+            encrypt: optionType === 'encrypt',
+            mask: optionType === 'mask',
+          },
+        };
+      });
+    };
+
+    // 定义列
+    const columns = [
+      {
+        title: intl.formatMessage({ id: 'pages.sync.fieldName' }),
+        dataIndex: 'fieldName',
+        key: 'fieldName',
+      },
+      {
+        title: intl.formatMessage({ id: 'pages.sync.fieldType' }),
+        dataIndex: 'fieldType',
+        key: 'fieldType',
+      },
+      // 当启用高级安全选项时显示操作列
+      ...(advancedSecurityEnabled
+        ? [
+            {
+              title: intl.formatMessage({ id: 'pages.sync.securityOptions' }),
+              key: 'securityOptions',
+              render: (_, record) => {
+                const fieldOptions = securityOptions[record.fieldName] || {
+                  encrypt: false,
+                  mask: false,
+                };
+
+                return (
+                  <Space size="middle">
+                    <Button
+                      type={fieldOptions.encrypt ? 'primary' : 'default'}
+                      icon={<LockOutlined />}
+                      size="small"
+                      onClick={() => handleSecurityOptionChange(record.fieldName, 'encrypt')}
+                      style={{ display: 'flex', alignItems: 'center' }}
+                    >
+                      {intl.formatMessage({ id: 'pages.sync.encrypt' })}
+                    </Button>
+                    <Button
+                      type={fieldOptions.mask ? 'primary' : 'default'}
+                      icon={<EyeInvisibleOutlined />}
+                      size="small"
+                      onClick={() => handleSecurityOptionChange(record.fieldName, 'mask')}
+                      style={{ display: 'flex', alignItems: 'center' }}
+                    >
+                      {intl.formatMessage({ id: 'pages.sync.mask' })}
+                    </Button>
+                  </Space>
+                );
+              },
+            },
+          ]
+        : []),
+    ];
+
+    // 表格数据源 - 修改数据处理方式，直接使用传入的数组
+    const dataSource = Array.isArray(table)
+      ? table.map((field) => ({
+          key: field.key || field.fieldName || field.name,
+          fieldName: field.fieldName || field.name,
+          fieldType: field.fieldType || field.type,
+        }))
+      : [];
+
+    return <Table columns={columns} dataSource={dataSource} pagination={false} />;
   };
 
   return (
     <StepsForm
       formRef={formRef}
       onFinish={handleSubmit}
-      // 设置 preserve: true 确保各步骤数据不被清除
       formProps={{ preserve: true }}
+      current={currentStep}
+      onCurrentChange={setCurrentStep}
       stepsFormRender={(dom, submitter) => (
         <Modal
           title={
-            record && record.id ? 'Edit Data Sync Configuration' : 'Add Data Sync Configuration'
+            record && record.id
+              ? intl.formatMessage({ id: 'pages.sync.editConfig' })
+              : intl.formatMessage({ id: 'pages.sync.addConfig' })
           }
           open
           footer={submitter}
@@ -580,7 +773,7 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
       {/* 步骤1：数据源类型和任务名称 + DB-specific params */}
       <StepsForm.StepForm
         name="dataSourceTypeStep"
-        title="Source Type"
+        title={intl.formatMessage({ id: 'pages.sync.sourceType' })}
         initialValues={{
           sourceType: record?.sourceType || 'mysql',
           taskName: record?.taskName || '',
@@ -595,19 +788,36 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
         }}
         onFinish={async (values) => {
           globalSourceType = values.sourceType || '';
+          if (record?.sourceConn) {
+            globalSourceConn = record.sourceConn;
+            setSourceConnectionInfo({
+              sourceType: values.sourceType,
+              sourceConn: record.sourceConn,
+            });
+          }
           return true;
         }}
       >
         <ProFormText
           name="taskName"
-          label="Task Name"
-          placeholder="Please enter the task name"
-          rules={[{ required: true, message: 'Please enter the task name' }]}
+          label={intl.formatMessage({ id: 'pages.sync.taskName' })}
+          placeholder={intl.formatMessage({ id: 'pages.sync.pleaseEnterTaskName' })}
+          rules={[
+            {
+              required: true,
+              message: intl.formatMessage({ id: 'pages.sync.pleaseEnterTaskName' }),
+            },
+          ]}
         />
         <ProFormSelect
           name="sourceType"
-          label="Source Type"
-          rules={[{ required: true, message: 'Please select the source type' }]}
+          label={intl.formatMessage({ id: 'pages.sync.sourceType' })}
+          rules={[
+            {
+              required: true,
+              message: intl.formatMessage({ id: 'pages.sync.pleaseSelectSourceType' }),
+            },
+          ]}
           options={[
             { label: 'mongodb', value: 'mongodb' },
             { label: 'mysql', value: 'mysql' },
@@ -649,34 +859,53 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
       {/* 步骤2：Source DB 连接信息 */}
       <StepsForm.StepForm
         name="sourceConnStep"
-        title="Source DB Connection"
+        title={intl.formatMessage({ id: 'pages.sync.sourceDBConn' })}
         initialValues={{ sourceConn: record?.sourceConn || {} }}
         onFinish={handleSourceConnNext}
       >
         <ProFormText
           name={['sourceConn', 'host']}
-          label="Host"
-          placeholder="Host"
-          rules={[{ required: true, message: 'Please enter the source DB host' }]}
+          label={intl.formatMessage({ id: 'pages.sync.host' })}
+          placeholder={intl.formatMessage({ id: 'pages.sync.pleaseEnterSourceHost' })}
+          rules={[
+            {
+              required: true,
+              message: intl.formatMessage({ id: 'pages.sync.pleaseEnterSourceHost' }),
+            },
+          ]}
         />
         <ProFormText
           name={['sourceConn', 'port']}
-          label="Port"
-          placeholder="Port"
-          rules={[{ required: true, message: 'Please enter the source DB port' }]}
+          label={intl.formatMessage({ id: 'pages.sync.port' })}
+          placeholder={intl.formatMessage({ id: 'pages.sync.pleaseEnterSourcePort' })}
+          rules={[
+            {
+              required: true,
+              message: intl.formatMessage({ id: 'pages.sync.pleaseEnterSourcePort' }),
+            },
+          ]}
         />
-        <ProFormText name={['sourceConn', 'user']} label="Username" placeholder="Username" />
+        <ProFormText
+          name={['sourceConn', 'user']}
+          label={intl.formatMessage({ id: 'pages.sync.username' })}
+          placeholder={intl.formatMessage({ id: 'pages.sync.pleaseEnterSourceUsername' })}
+        />
         <ProFormText
           name={['sourceConn', 'password']}
-          label="Password"
-          placeholder="Password"
+          label={intl.formatMessage({ id: 'pages.sync.password' })}
+          placeholder={intl.formatMessage({ id: 'pages.sync.pleaseEnterSourcePassword' })}
           fieldProps={{ type: 'password' }}
         />
         <ProFormText
           name={['sourceConn', 'database']}
-          label="Database Name"
-          placeholder="Database Name"
-          rules={[{ required: true, message: 'Please enter the source DB name' }]}
+          label={intl.formatMessage({ id: 'pages.sync.databaseName' })}
+          placeholder={intl.formatMessage({ id: 'pages.sync.pleaseEnterSourceDB' })}
+          rules={[
+            {
+              required: true,
+              message: intl.formatMessage({ id: 'pages.sync.pleaseEnterSourceDB' }),
+            },
+          ]}
         />
         <Space>
           <Button onClick={testSourceConn}>Test Connection</Button>
@@ -686,34 +915,53 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
       {/* 步骤3：Target DB 连接信息 */}
       <StepsForm.StepForm
         name="targetConnStep"
-        title="Target DB Connection"
+        title={intl.formatMessage({ id: 'pages.sync.targetDBConn' })}
         initialValues={{ targetConn: record?.targetConn || {} }}
         onFinish={handleTargetConnNext}
       >
         <ProFormText
           name={['targetConn', 'host']}
-          label="Host"
-          placeholder="Host"
-          rules={[{ required: true, message: 'Please enter the target DB host' }]}
+          label={intl.formatMessage({ id: 'pages.sync.host' })}
+          placeholder={intl.formatMessage({ id: 'pages.sync.pleaseEnterTargetHost' })}
+          rules={[
+            {
+              required: true,
+              message: intl.formatMessage({ id: 'pages.sync.pleaseEnterTargetHost' }),
+            },
+          ]}
         />
         <ProFormText
           name={['targetConn', 'port']}
-          label="Port"
-          placeholder="Port"
-          rules={[{ required: true, message: 'Please enter the target DB port' }]}
+          label={intl.formatMessage({ id: 'pages.sync.port' })}
+          placeholder={intl.formatMessage({ id: 'pages.sync.pleaseEnterTargetPort' })}
+          rules={[
+            {
+              required: true,
+              message: intl.formatMessage({ id: 'pages.sync.pleaseEnterTargetPort' }),
+            },
+          ]}
         />
-        <ProFormText name={['targetConn', 'user']} label="Username" placeholder="Username" />
+        <ProFormText
+          name={['targetConn', 'user']}
+          label={intl.formatMessage({ id: 'pages.sync.username' })}
+          placeholder={intl.formatMessage({ id: 'pages.sync.pleaseEnterTargetUsername' })}
+        />
         <ProFormText
           name={['targetConn', 'password']}
-          label="Password"
-          placeholder="Password"
+          label={intl.formatMessage({ id: 'pages.sync.password' })}
+          placeholder={intl.formatMessage({ id: 'pages.sync.pleaseEnterTargetPassword' })}
           fieldProps={{ type: 'password' }}
         />
         <ProFormText
           name={['targetConn', 'database']}
-          label="Database Name"
-          placeholder="Database Name"
-          rules={[{ required: true, message: 'Please enter the target DB name' }]}
+          label={intl.formatMessage({ id: 'pages.sync.databaseName' })}
+          placeholder={intl.formatMessage({ id: 'pages.sync.pleaseEnterTargetDB' })}
+          rules={[
+            {
+              required: true,
+              message: intl.formatMessage({ id: 'pages.sync.pleaseEnterTargetDB' }),
+            },
+          ]}
         />
         <Space>
           <Button onClick={testTargetConn}>Test Connection</Button>
@@ -721,10 +969,16 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
       </StepsForm.StepForm>
 
       {/* 步骤4：表/集合映射 */}
-      <StepsForm.StepForm name="mappingStep" title="Table/Collection Mapping">
+      <StepsForm.StepForm
+        name="mappingStep"
+        title={intl.formatMessage({ id: 'pages.sync.tableMapping' })}
+      >
         <Transfer
           dataSource={tableData}
-          titles={['Available Tables', 'Selected']}
+          titles={[
+            intl.formatMessage({ id: 'pages.sync.availableTables' }),
+            intl.formatMessage({ id: 'pages.sync.selectedTables' }),
+          ]}
           targetKeys={targetKeys}
           selectedKeys={selectedKeys}
           onChange={onTransferChange}
@@ -741,7 +995,7 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
             style={{ marginRight: 8 }}
           />
           <Typography.Text strong>
-            {intl.formatMessage({ id: 'pages.syncSettings.advancedSecurity' })}
+            {intl.formatMessage({ id: 'pages.sync.advancedSecurity' })}
           </Typography.Text>
         </div>
 
@@ -749,20 +1003,28 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
         {showSecurityOptions && (
           <div style={{ marginTop: 16 }}>
             <Collapse>
-              {targetKeys.map((tableName) => (
-                <Collapse.Panel
-                  header={`${intl.formatMessage({ id: 'pages.syncSettings.table' })}${tableName}`}
-                  key={tableName}
-                >
-                  <Table
-                    dataSource={fieldsMockData[tableName as keyof typeof fieldsMockData] || []}
-                    columns={fieldsColumns}
-                    pagination={false}
-                    size="small"
-                    rowKey="key"
-                  />
-                </Collapse.Panel>
-              ))}
+              {(targetKeys || []).map((tableName) => {
+                console.log(`表 ${tableName} 的字段数据:`, fieldsMockData[tableName]);
+                return (
+                  <Collapse.Panel
+                    header={`${intl.formatMessage({ id: 'pages.syncSettings.table' })}${tableName}`}
+                    key={tableName}
+                  >
+                    {isLoadingFields && !fieldsMockData[tableName] ? (
+                      <div style={{ textAlign: 'center', padding: '20px' }}>
+                        <Spin
+                          tip={intl.formatMessage({ id: 'pages.syncSettings.loadingFields' })}
+                        />
+                      </div>
+                    ) : (
+                      <TableSchemaComponent
+                        table={fieldsMockData[tableName] || []}
+                        advancedSecurityEnabled={showSecurityOptions}
+                      />
+                    )}
+                  </Collapse.Panel>
+                );
+              })}
             </Collapse>
           </div>
         )}

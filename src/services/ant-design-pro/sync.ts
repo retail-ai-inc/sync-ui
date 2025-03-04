@@ -110,3 +110,23 @@ export async function deleteSyncTask(id: number) {
     method: 'DELETE',
   });
 }
+
+/**
+ * POST /api/tables/schema
+ */
+export async function getTableSchema(params: {
+  sourceType: string;
+  connection: {
+    host: string;
+    port: string;
+    user: string;
+    password: string;
+    database: string;
+  };
+  tableName: string;
+}) {
+  return request('/api/tables/schema', {
+    method: 'POST',
+    data: params,
+  });
+}

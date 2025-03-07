@@ -21,7 +21,7 @@ import { LockOutlined, EyeInvisibleOutlined } from '@ant-design/icons';
 import type { TransferDirection } from 'antd/es/transfer';
 import type { FormInstance } from 'antd';
 import type { Key } from 'antd/es/table/interface';
-import { addSyncTask, updateSyncTask, getTableSchema } from '@/services/ant-design-pro/sync';
+import { addSyncTask, updateSync, getTableSchema } from '@/services/ant-design-pro/sync';
 import { useIntl } from '@umijs/max';
 
 interface SyncConn {
@@ -95,13 +95,6 @@ interface FieldSecurityOption {
   securityType: 'encrypted' | 'masked';
 }
 
-// 修改 TableSecurityOptions 接口以便被使用
-interface TableSecurityOption {
-  sourceTable: string;
-  targetTable: string;
-  fieldSecurity: FieldSecurityOption[];
-}
-
 interface FieldOption {
   encrypt: boolean;
   mask: boolean;
@@ -111,12 +104,6 @@ interface TableSchemaComponentProps {
   table: any[];
   advancedSecurityEnabled: boolean;
 }
-
-// 实现 collectSecurityOptions 函数 (之前只是声明但未实现)
-const collectSecurityOptions = (): TableSecurityOption[] => {
-  // 这里应该有实现，我添加一个简单的实现作为示例
-  return [];
-};
 
 const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
   const [targetKeys, setTargetKeys] = useState<string[]>([]);
@@ -365,35 +352,52 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
 
   // 点击最右侧"提交"时执行
   const handleSubmit = async (values: any) => {
-    // 收集安全选项
-    const tableSecurityOptions = collectSecurityOptions();
-
-    // 将高级安全选项状态仅添加到顶级，不在mappings中重复
+    // 将高级安全选项状态仅添加到顶级
     values.securityEnabled = showSecurityOptions;
 
-    // 组装 mappings 字段
+    // 组装 mappings 字段，并将安全选项集成到每个表对象中
     values.mappings = [
       {
-        tables: (targetKeys || []).map((key) => {
-          // 查找当前表的安全选项，添加类型注解
-          const securityOptions = tableSecurityOptions.find(
-            (option: TableSecurityOption) => option.sourceTable === key,
-          );
+        tables: (targetKeys || []).map((tableName) => {
+          // 基本表映射对象
+          const tableMapping: TableItem = {
+            sourceTable: tableName,
+            targetTable: tableName,
+          };
 
-          if (securityOptions) {
-            // 如果有安全选项，包含fieldSecurity
-            return {
-              sourceTable: key,
-              targetTable: key,
-              fieldSecurity: securityOptions.fieldSecurity,
-            };
-          } else {
-            // 否则返回基本信息
-            return {
-              sourceTable: key,
-              targetTable: key,
-            };
+          // 如果启用了安全选项且该表有安全设置
+          if (showSecurityOptions && tablesSecurityOptions[tableName]) {
+            // 将安全选项转换为正确的 fieldSecurity 格式
+            const fieldSecurity = Object.keys(tablesSecurityOptions[tableName])
+              .map((fieldName) => {
+                const options = tablesSecurityOptions[tableName][fieldName];
+                let securityType = null;
+
+                // 确定安全类型 - 优先选择 encrypt，其次是 mask
+                if (options.encrypt) {
+                  securityType = 'encrypted';
+                } else if (options.mask) {
+                  securityType = 'masked';
+                }
+
+                // 只有当有安全类型设置时才返回
+                if (securityType) {
+                  return {
+                    field: fieldName,
+                    securityType: securityType,
+                  };
+                }
+                return null;
+              })
+              .filter((item) => item !== null); // 过滤掉没有设置安全类型的字段
+
+            // 只有当有字段安全设置时才添加 fieldSecurity 数组
+            if (fieldSecurity.length > 0) {
+              tableMapping.fieldSecurity = fieldSecurity;
+            }
           }
+
+          return tableMapping;
         }),
       },
     ];
@@ -474,14 +478,22 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
 
     let res;
     if (record && record.id) {
-      // 合并旧数据
-      res = await updateSyncTask({
+      // 合并旧数据 - 确保安全选项正确传递
+      const finalBody = {
         ...record,
         ...payload,
+        // 显式地添加安全选项，确保不会被覆盖
+        securityOptions: values.securityOptions,
+      };
+
+      res = await updateSync({
+        id: record.id.toString(),
+        body: finalBody,
       });
     } else {
-      // 新增任务时，默认status为Running
+      // 新增任务时，同样确保安全选项正确传递
       payload.status = 'Running';
+      payload.securityOptions = values.securityOptions; // 显式地添加安全选项
       res = await addSyncTask(payload);
     }
 

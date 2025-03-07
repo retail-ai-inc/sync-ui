@@ -111,4 +111,18 @@ declare namespace API {
     success?: boolean;
     message?: string;
   };
+
+  export interface SyncListItem {
+    // ... 现有字段 ...
+    securityEnabled?: boolean;
+    securityOptions?: {
+      [tableName: string]: {
+        [fieldName: string]: {
+          encrypt?: boolean;
+          mask?: boolean;
+        };
+      };
+    };
+    // ... 其他字段 ...
+  }
 }

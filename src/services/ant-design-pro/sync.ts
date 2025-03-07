@@ -94,11 +94,19 @@ export async function fetchSyncLogs(id: number, params: any) {
 /**
  * PUT /api/sync/{id}
  */
-export async function updateSyncTask(data: any) {
-  const { id, ...rest } = data;
-  return request<{ success: boolean; data: any }>(`/api/sync/${id}`, {
+export async function updateSync(params: { id: string; body: API.SyncListItem }) {
+  const { id, body } = params;
+
+  // 确保安全选项的字段设置也被传递到后端
+  const requestBody = {
+    ...body,
+    // 如果存在字段安全设置，确保它们被包含
+    securityOptions: body.securityOptions || {},
+  };
+
+  return request(`/api/sync/${id}`, {
     method: 'PUT',
-    data: rest,
+    data: requestBody,
   });
 }
 

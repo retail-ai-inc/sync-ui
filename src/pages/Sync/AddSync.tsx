@@ -815,26 +815,80 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
       });
     };
 
-    // 定义列
+    // 重新组织字段数据，将嵌套字段分组
+    const organizeFields = (fields: any[]) => {
+      const result: any[] = [];
+      const nestedFields: Record<string, any[]> = {};
+
+      fields.forEach((field) => {
+        const fieldName = field.fieldName || field.name;
+        if (fieldName.includes('.')) {
+          const [parent, child] = fieldName.split('.');
+          if (!nestedFields[parent]) {
+            // 首次遇到父字段时，添加父字段
+            nestedFields[parent] = [];
+            result.push({
+              key: parent,
+              fieldName: parent,
+              fieldType: field.fieldType || field.type,
+              isParent: true,
+              children: nestedFields[parent],
+            });
+          }
+          // 将子字段添加到对应的父字段的children数组中
+          nestedFields[parent].push({
+            key: `${parent}.${child}`,
+            fieldName: child,
+            fieldType: field.fieldType || field.type,
+            fullFieldName: fieldName, // 保存完整字段名用于安全选项
+          });
+        } else {
+          // 非嵌套字段直接添加
+          result.push({
+            key: fieldName,
+            fieldName: fieldName,
+            fieldType: field.fieldType || field.type,
+          });
+        }
+      });
+
+      return result;
+    };
+
+    // 修改列定义
     const columns = [
       {
         title: intl.formatMessage({ id: 'pages.sync.fieldName' }),
         dataIndex: 'fieldName',
         key: 'fieldName',
+        render: (text: string, record: any) => {
+          // 为父字段添加加粗样式
+          return record.isParent ? (
+            <Typography.Text strong>{text}</Typography.Text>
+          ) : (
+            <span style={{ paddingLeft: record.fullFieldName ? 24 : 0 }}>{text}</span>
+          );
+        },
       },
       {
         title: intl.formatMessage({ id: 'pages.sync.fieldType' }),
         dataIndex: 'fieldType',
         key: 'fieldType',
       },
-      // 当启用高级安全选项时显示操作列
       ...(advancedSecurityEnabled
         ? [
             {
               title: intl.formatMessage({ id: 'pages.sync.securityOptions' }),
               key: 'securityOptions',
               render: (_: any, record: any) => {
-                const fieldOptions = securityOptions[record.fieldName] || {
+                // 使用完整字段名（对于嵌套字段）或普通字段名
+                const fieldName = record.fullFieldName || record.fieldName;
+                // 父字段不显示安全选项
+                if (record.isParent) {
+                  return null;
+                }
+
+                const fieldOptions = securityOptions[fieldName] || {
                   encrypt: false,
                   mask: false,
                 };
@@ -845,7 +899,7 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
                       type={fieldOptions.encrypt ? 'primary' : 'default'}
                       icon={<LockOutlined />}
                       size="small"
-                      onClick={() => handleSecurityOptionChange(record.fieldName, 'encrypt')}
+                      onClick={() => handleSecurityOptionChange(fieldName, 'encrypt')}
                       style={{ display: 'flex', alignItems: 'center' }}
                     >
                       {intl.formatMessage({ id: 'pages.sync.encrypt' })}
@@ -854,7 +908,7 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
                       type={fieldOptions.mask ? 'primary' : 'default'}
                       icon={<EyeInvisibleOutlined />}
                       size="small"
-                      onClick={() => handleSecurityOptionChange(record.fieldName, 'mask')}
+                      onClick={() => handleSecurityOptionChange(fieldName, 'mask')}
                       style={{ display: 'flex', alignItems: 'center' }}
                     >
                       {intl.formatMessage({ id: 'pages.sync.mask' })}
@@ -867,16 +921,31 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
         : []),
     ];
 
-    // 表格数据源 - 修改数据处理方式，直接使用传入的数组
-    const dataSource = Array.isArray(table)
-      ? table.map((field) => ({
-          key: field.key || field.fieldName || field.name,
-          fieldName: field.fieldName || field.name,
-          fieldType: field.fieldType || field.type,
-        }))
-      : [];
+    // 处理表格数据源
+    const dataSource = organizeFields(
+      Array.isArray(table)
+        ? table.map((field) => ({
+            key: field.key || field.fieldName || field.name,
+            fieldName: field.fieldName || field.name,
+            fieldType: field.fieldType || field.type,
+          }))
+        : [],
+    );
 
-    return <Table columns={columns} dataSource={dataSource} pagination={false} />;
+    return (
+      <Table
+        columns={columns}
+        dataSource={dataSource}
+        pagination={false}
+        indentSize={24}
+        defaultExpandAllRows={true}
+        expandable={{
+          expandRowByClick: false,
+          expandedRowKeys: dataSource.filter((item) => item.isParent).map((item) => item.key),
+          rowExpandable: (record) => record.isParent,
+        }}
+      />
+    );
   };
 
   // 修改安全选项初始化逻辑，确保securityEnabled正确加载

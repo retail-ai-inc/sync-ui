@@ -397,7 +397,9 @@ const Dashboard: React.FC = () => {
               <div className={styles.statTitle}>
                 {intl.formatMessage({ id: 'pages.dashboard.syncStatus' })}
                 <Tooltip title={intl.formatMessage({ id: 'pages.dashboard.mockDataHint' })}>
-                  <InfoCircleOutlined style={{ marginLeft: 8, color: '#999' }} />
+                  <span style={{ display: 'inline-block' }}>
+                    <InfoCircleOutlined style={{ marginLeft: 8, color: '#999' }} />
+                  </span>
                 </Tooltip>
               </div>
               <div className={styles.statValue}>

@@ -26,8 +26,8 @@ const SqlDebug: React.FC = () => {
       try {
         const res = await fetchSyncList();
         if (res.success) {
-          setSyncList(res.data);
-          if (res.data.length > 0) {
+          setSyncList(res.data || []);
+          if (res.data && res.data.length > 0) {
             setSelectedTaskId(res.data[0].id);
             setSelectedTask(res.data[0]);
           }

@@ -32,7 +32,7 @@ export default [
   },
   {
     path: '/Sync/monitor',
-    name: '数据同步监控',
+    name: 'DataSyncMonitoring',
     component: './Sync/Monitor',
     hideInMenu: true, // 不在菜单中显示
   },
@@ -63,7 +63,7 @@ export default [
   },
   {
     path: '/sql-debug',
-    name: 'SQL调试工具',
+    name: 'SQLDebugTool',
     icon: 'CodeOutlined',
     component: './SqlDebug',
   },

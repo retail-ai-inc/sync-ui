@@ -90,7 +90,7 @@ const SyncList: React.FC = () => {
       const res = await fetchSyncList();
       if (res.success) {
         console.log('res.data =>', res.data);
-        setSyncList(res.data);
+        setSyncList(res.data || []);
       }
     } catch (error) {
       message.error('Failed to load data');

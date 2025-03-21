@@ -52,7 +52,11 @@ export default {
   'menu.editor.mind': 'Mind Editor',
   'menu.editor.koni': 'Koni Editor',
   'menu.Data Sync Tasks': 'Data Sync Tasks',
-  'menu.数据同步监控': 'Data Sync Monitoring',
+  'menu.DataSyncMonitoring': 'Data Sync Monitoring',
   'menu.account.authSettings': 'Authentication Settings',
-  'menu.SQL调试工具': 'SQL Debug Tool',
+  'menu.SQLDebugTool': 'SQL Debug Tool',
+  'menu.sync': 'Synchronization',
+  'menu.settings': 'Settings',
+  'menu.settings.authSettings': 'Authentication Settings',
+  // Add other missing translation keys as needed
 };

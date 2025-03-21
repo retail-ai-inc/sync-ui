@@ -8,6 +8,7 @@ import React from 'react';
 import defaultSettings from '../config/defaultSettings';
 import { errorConfig } from './requestErrorConfig';
 import { ConfigProvider, App } from 'antd';
+import { setLocale } from 'umi';
 
 const isDev = process.env.NODE_ENV === 'development';
 const loginPath = '/user/login';
@@ -162,4 +163,11 @@ export function rootContainer(container) {
       </App>
     </ConfigProvider>
   );
+}
+
+// 设置默认语言为英文
+export function render(oldRender) {
+  // 强制设置为英文
+  setLocale('en-US', false);
+  oldRender();
 }

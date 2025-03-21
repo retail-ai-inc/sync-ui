@@ -61,4 +61,10 @@ export default [
       // 可以在此添加更多设置子页面
     ],
   },
+  {
+    path: '/sql-debug',
+    name: 'SQL调试工具',
+    icon: 'CodeOutlined',
+    component: './SqlDebug',
+  },
 ];

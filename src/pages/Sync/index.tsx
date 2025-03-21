@@ -79,7 +79,7 @@ const SyncList: React.FC = () => {
   ]);
 
   const navigate = useNavigate();
-  const searchInputRef = useRef<Input>(null);
+  const searchInputRef = useRef<any>(null);
   const access = useAccess();
   const isGuest = !access.canAdmin;
 
@@ -296,7 +296,7 @@ const SyncList: React.FC = () => {
   const displayedColumns = columns.filter((col) => displayColumns.includes(col.key as string));
 
   // Simple front-end filter
-  const filteredData = syncList.filter((item) => {
+  const filteredData = (syncList || []).filter((item) => {
     const kw = searchValue.toLowerCase();
     return (
       (item.taskName || '').toLowerCase().includes(kw) ||

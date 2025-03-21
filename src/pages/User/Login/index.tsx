@@ -165,6 +165,8 @@ const Login: React.FC = () => {
 
   const { status } = userLoginState;
 
+  console.log('Current locale:', intl.locale);
+
   return (
     <div className={styles.container}>
       <Helmet>
@@ -190,6 +192,11 @@ const Login: React.FC = () => {
           logo={<img alt="logo" src="/logo.svg" />}
           title="Sync Data Platform"
           subTitle={intl.formatMessage({ id: 'pages.layouts.userLayout.title' })}
+          submitter={{
+            searchConfig: {
+              submitText: intl.formatMessage({ id: 'pages.login.submit' }, { locale: 'en-US' }),
+            },
+          }}
           initialValues={{
             autoLogin: true,
           }}

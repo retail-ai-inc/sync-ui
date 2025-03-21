@@ -966,53 +966,16 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
       else if (
         record.mappings &&
         record.mappings.length > 0 &&
-        record.mappings[0].securityEnabled !== undefined
+        record.mappings[0]?.securityEnabled !== undefined // 添加可选链
       ) {
         securityEnabled = !!record.mappings[0].securityEnabled;
         console.log('Using mapping securityEnabled:', securityEnabled);
       }
 
-      // 设置状态值，并确保它被正确应用
-      console.log('Setting showSecurityOptions to:', securityEnabled);
+      // 设置状态值
       setShowSecurityOptions(securityEnabled);
-
-      // 确保UI组件反映这个状态
-      setTimeout(() => {
-        const currentValue = showSecurityOptions;
-        console.log('Current showSecurityOptions after setting:', currentValue);
-        if (currentValue !== securityEnabled) {
-          // 如果状态没有正确更新，强制再次更新
-          console.log('Forcing update of showSecurityOptions');
-          setShowSecurityOptions(securityEnabled);
-        }
-      }, 100);
-
-      // 初始化表安全选项
-      if (record.mappings && record.mappings.length > 0 && record.mappings[0].tables) {
-        const securityOptions: Record<string, Record<string, FieldOption>> = {};
-
-        record.mappings[0].tables.forEach((table) => {
-          if (table.fieldSecurity && table.fieldSecurity.length > 0) {
-            const tableOptions: Record<string, FieldOption> = {};
-
-            table.fieldSecurity.forEach((field) => {
-              tableOptions[field.field] = {
-                encrypt: field.securityType === 'encrypted',
-                mask: field.securityType === 'masked',
-              };
-            });
-
-            securityOptions[table.sourceTable] = tableOptions;
-          }
-        });
-
-        // 更新状态
-        if (Object.keys(securityOptions).length > 0) {
-          setTablesSecurityOptions(securityOptions);
-        }
-      }
     }
-  }, [record]); // 仅当record变化时触发
+  }, [record]);
 
   return (
     <StepsForm

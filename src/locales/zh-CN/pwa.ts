@@ -1,6 +1,6 @@
 export default {
-  'app.pwa.offline': '当前处于离线状态',
-  'app.pwa.serviceworker.updated': '有新内容',
-  'app.pwa.serviceworker.updated.hint': '请点击“刷新”按钮或者手动刷新页面',
-  'app.pwa.serviceworker.updated.ok': '刷新',
+  'app.pwa.offline': 'You are offline now',
+  'app.pwa.serviceworker.updated': 'New content is available',
+  'app.pwa.serviceworker.updated.hint': 'Please press the "Refresh" button to reload current page',
+  'app.pwa.serviceworker.updated.ok': 'Refresh',
 };

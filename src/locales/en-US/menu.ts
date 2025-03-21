@@ -54,4 +54,5 @@ export default {
   'menu.Data Sync Tasks': 'Data Sync Tasks',
   'menu.数据同步监控': 'Data Sync Monitoring',
   'menu.account.authSettings': 'Authentication Settings',
+  'menu.SQL调试工具': 'SQL Debug Tool',
 };

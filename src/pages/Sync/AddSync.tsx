@@ -1217,7 +1217,12 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
           onChange={onTransferChange}
           onSelectChange={onSelectChange}
           render={(item) => item.title}
-          listStyle={{ width: 200, height: 300 }}
+          listStyle={{ width: 300, height: 400 }}
+          showSearch
+          filterOption={(inputValue, option) =>
+            option.title.toLowerCase().indexOf(inputValue.toLowerCase()) !== -1
+          }
+          searchPlaceholder={intl.formatMessage({ id: 'pages.sync.searchTables' })}
         />
 
         {/* 添加高级安全选项开关 */}

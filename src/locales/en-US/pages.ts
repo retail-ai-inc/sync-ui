@@ -306,4 +306,5 @@ export default {
   'pages.sqlDebug.target': 'Target',
   'pages.sqlDebug.redisNotSupported':
     'Redis data source does not support SQL operations, please use Redis commands',
+  'pages.sync.searchTables': 'Search tables',
 };

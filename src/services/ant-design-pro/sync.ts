@@ -138,3 +138,30 @@ export async function getTableSchema(params: {
     data: params,
   });
 }
+
+/**
+ * GET /api/sync/{id}/tables
+ * 获取同步任务的表详情及同步数据量
+ */
+export interface SyncTableItem {
+  tableName: string;
+  syncedToday: number;
+  totalRows: number;
+  lastSyncTime: string;
+}
+
+export interface SyncTablesResponse {
+  success: boolean;
+  data: {
+    syncDate: string;
+    tableCount: number;
+    tables: SyncTableItem[];
+    taskId: string;
+  };
+}
+
+export async function fetchSyncTables(id: number) {
+  return request<SyncTablesResponse>(`/api/sync/${id}/tables`, {
+    method: 'GET',
+  });
+}

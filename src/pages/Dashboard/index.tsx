@@ -352,6 +352,12 @@ const Dashboard: React.FC = () => {
     slider: {
       start: 0.1,
       end: 0.9,
+      x: {
+        labelFormatter: (d: any) => new Date(d).toLocaleDateString(),
+      },
+      y: {
+        labelFormatter: '~s',
+      },
     },
     legend: { position: 'top' },
     height: 300,

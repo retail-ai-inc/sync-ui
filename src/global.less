@@ -35,6 +35,19 @@ ol {
   list-style: none;
 }
 
+/* 修复光标闪烁问题 */
+* {
+  outline: none;
+  caret-color: transparent;
+}
+
+/* 允许输入框和文本域显示光标 */
+input,
+textarea,
+[contenteditable='true'] {
+  caret-color: auto;
+}
+
 @media (max-width: 768px) {
   .ant-table {
     width: 100%;

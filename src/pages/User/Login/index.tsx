@@ -60,21 +60,23 @@ const LoginMessage: React.FC<{
   content: string;
 }> = ({ content }) => {
   return (
-    <Alert
-      style={{
-        marginBottom: 24,
-      }}
-      message={content}
-      type="error"
-      showIcon
-    />
+    <div tabIndex={-1} aria-hidden="true">
+      <Alert
+        style={{
+          marginBottom: 24,
+        }}
+        message={content}
+        type="error"
+        showIcon
+      />
+    </div>
   );
 };
 
 const Login: React.FC = () => {
   const [userLoginState, setUserLoginState] = useState<API.LoginResult>({});
   const [googleConfigLoaded, setGoogleConfigLoaded] = useState<boolean>(false);
-  const [googleConfig, setGoogleConfig] = useState<OAuthConfigResponse['data'] | null>(null);
+  const [googleConfig, setGoogleConfig] = useState<API.OAuthConfigResponse['data'] | null>(null);
   const { initialState, setInitialState } = useModel('@@initialState');
   const { styles } = useStyles();
   const intl = useIntl();
@@ -89,13 +91,17 @@ const Login: React.FC = () => {
         // 检查是否启用OAuth
         const enabled =
           response.success &&
-          (response.data.enabled !== undefined ? response.data.enabled : !!response.data.clientId);
+          (response.data?.enabled !== undefined
+            ? response.data.enabled
+            : !!response.data?.clientId);
         setOauthEnabled(enabled);
 
         // 如果启用了，设置配置
-        if (enabled && response.data) {
+        if (enabled && response.data && 'clientId' in response.data) {
           setGoogleConfig(response.data);
           setGoogleConfigLoaded(true);
+        } else {
+          setGoogleConfigLoaded(false);
         }
       } catch (error) {
         console.error('加载Google登录配置失败:', error);
@@ -216,6 +222,16 @@ const Login: React.FC = () => {
             fieldProps={{
               size: 'large',
               prefix: <UserOutlined />,
+              onKeyDown: (e) => {
+                if (e.key === 'Tab') {
+                  // 获取密码输入框并强制聚焦
+                  const passwordInput = document.querySelector('input[type="password"]');
+                  if (passwordInput) {
+                    e.preventDefault();
+                    (passwordInput as HTMLElement).focus();
+                  }
+                }
+              },
             }}
             placeholder={intl.formatMessage({
               id: 'pages.login.username.placeholder',

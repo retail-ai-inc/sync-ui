@@ -151,15 +151,42 @@ const Monitor: React.FC = () => {
   const loadLogs = async () => {
     if (!taskId) return;
     try {
+      // 在加载新日志前先清空日志列表
+      setLogs([]);
+
+      // 添加时间范围参数
+      let timeParams = {};
+      if (timeRange !== 'custom') {
+        timeParams = { range: timeRange };
+      } else if (customTimeRange && customTimeRange.length === 2) {
+        timeParams = {
+          startTime: customTimeRange[0].toISOString(),
+          endTime: customTimeRange[1].toISOString(),
+        };
+      }
+
       const res = await fetchSyncLogs(Number(taskId), {
         level: logLevel,
         search: logSearch,
+        ...timeParams,
       });
+
       if (res.success) {
-        setLogs(res.data);
+        // 处理res.data为null的情况
+        const safeData = Array.isArray(res.data) ? res.data : [];
+
+        // 确保只显示指定级别的日志（前端额外过滤）
+        const filteredLogs = logLevel
+          ? safeData.filter((log) => log.level.toUpperCase() === logLevel.toUpperCase())
+          : safeData;
+
+        setLogs(filteredLogs);
       }
-    } catch {
-      message.error('Failed to load logs');
+    } catch (error) {
+      // 不显示"Failed to load logs"错误信息
+      console.error('Log loading error:', error);
+      // 将日志设为空数组，而不是显示错误
+      setLogs([]);
     }
   };
 
@@ -216,6 +243,11 @@ const Monitor: React.FC = () => {
     };
   }, [autoRefresh, timeRange, customTimeRange, logLevel, logSearch]);
 
+  // 当日志筛选条件改变时重新加载日志
+  useEffect(() => {
+    loadLogs();
+  }, [logLevel, logSearch, timeRange, customTimeRange]);
+
   // ========== Handlers ==========
   const handleTimeRangeChange = (e: any) => {
     const newRange = e.target.value;
@@ -238,8 +270,15 @@ const Monitor: React.FC = () => {
   };
 
   const handleChangeLogLevel = (val: string) => {
+    // 立即清空日志列表，避免显示旧数据
+    setLogs([]);
     setLogLevel(val);
-    loadLogs();
+  };
+
+  const handleLogSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // 立即清空日志列表，避免显示旧数据
+    setLogs([]);
+    setLogSearch(e.target.value);
   };
 
   // ========== Logs Table ==========
@@ -249,6 +288,11 @@ const Monitor: React.FC = () => {
     INFO: 'blue',
     DEBUG: 'green',
   };
+
+  // 在将数据传递给表格前进行最终过滤，确保只显示符合当前筛选条件的日志
+  const filteredLogs = logLevel
+    ? logs.filter((log) => log.level.toUpperCase() === logLevel.toUpperCase())
+    : logs;
 
   const columns = [
     {
@@ -284,19 +328,20 @@ const Monitor: React.FC = () => {
   });
 
   // 创建一个颜色映射
-  const colorMap = {};
+  const colorMap: Record<string, string> = {};
   // const colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']; // 颜色数组
 
   const rowCountFiltered = rowCountFilteredRaw.map((p) => {
     // 如果当前表没有颜色映射，则分配一个新颜色
-    if (!colorMap[p.table]) {
-      colorMap[p.table] = p.table; // 循环使用颜色
+    const tableKey = p.table || 'default';
+    if (!colorMap[tableKey]) {
+      colorMap[tableKey] = tableKey; // 循环使用颜色
       // colorIndex++; // 删除或注释掉未使用的递增语句
     }
     return {
       ...p,
       tableType: p.table ? `${p.table}-${p.type}` : p.type,
-      color: colorMap[p.table], // 为每个表分配颜色
+      color: colorMap[tableKey], // 为每个表分配颜色
     };
   });
 
@@ -315,7 +360,7 @@ const Monitor: React.FC = () => {
       start: 0.1, // Set the initial zoom range for the slider (10% of the data)
       end: 0.9, // Set the initial end of the zoom range (90% of the data)
       x: {
-        labelFormatter: (d) => new Date(d).toLocaleDateString(), // Format the x-axis date values
+        labelFormatter: (d: string) => new Date(d).toLocaleDateString(), // Format the x-axis date values
       },
       y: {
         labelFormatter: '~s', // Format Y-axis labels with shorthand notation
@@ -458,14 +503,14 @@ const Monitor: React.FC = () => {
           <Input
             placeholder="Search logs"
             value={logSearch}
-            onChange={(e) => setLogSearch(e.target.value)}
+            onChange={handleLogSearchChange}
             style={{ width: 200 }}
           />
           <Button onClick={handleLogsRefresh}>Refresh</Button>
         </Space>
         <Table<LogItem>
           columns={columns}
-          dataSource={logs}
+          dataSource={filteredLogs}
           rowKey={(record) => record.time + record.message}
           pagination={{
             defaultPageSize: 20,

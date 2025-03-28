@@ -37,6 +37,20 @@ declare namespace API {
     pageSize?: number;
   };
 
+  type OAuthConfigResponse = {
+    data: {
+      clientId: string;
+      clientSecret: string;
+      authUri: string;
+      redirectUri: string;
+      scopes: string[];
+      enabled?: boolean;
+    };
+    success: boolean;
+    error?: string;
+    errorMessage?: string;
+  };
+
   type RuleListItem = {
     key?: number;
     disabled?: boolean;

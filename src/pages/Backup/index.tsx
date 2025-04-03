@@ -570,37 +570,55 @@ const JobList: React.FC = () => {
   // 处理表数据更新，当测试连接成功后调用
   const handleTablesUpdated = async (tables: string[], formData: JobFormData) => {
     try {
-      // 处理表格数据，不创建未使用的items变量
-      // 原来的代码：const items: TableItem[] = tables.map(table => ({
-      // 直接使用map方法，但不保存结果
-      tables.map((table) => ({
+      if (!tables || tables.length === 0) {
+        return;
+      }
+
+      // 将所有表格数据添加到tableItems状态
+      const items: TableItem[] = tables.map((table) => ({
         key: table,
         title: table,
-        chosen: false,
+        chosen: selectedTables.includes(table),
       }));
 
-      // 保存当前选择的表格
-      setSelectedTables(tables);
-      setTargetTableKeys(tables);
+      // 设置表格项到状态中，这样穿梭框能显示所有可用表格
+      setTableItems(items);
 
-      // 为每个表获取字段信息，使用传入的表单数据而不是jobFormData状态
+      // 判断是新建任务还是编辑任务
+      if (editingJobId) {
+        // 编辑模式：保留之前选中的表，但只保留那些在新表列表中存在的
+        const validSelectedTables = selectedTables.filter((t) => tables.includes(t));
+        setSelectedTables(validSelectedTables);
+        setTargetTableKeys(validSelectedTables);
+      } else {
+        // 新建模式：默认不选中任何表
+        setSelectedTables([]);
+        setTargetTableKeys([]);
+      }
+
+      // 为每个表获取字段信息
       const fieldsPromises = tables.map(async (table) => {
         const fields = await fetchTableFields(table, formData);
         return { table, fields };
       });
 
-      // 等待所有字段获取完成
-      const results = await Promise.all(fieldsPromises);
+      // 并行请求所有表的字段
+      const fieldsResults = await Promise.all(fieldsPromises);
 
-      // 更新字段状态
-      const fieldsData: { [table: string]: string[] } = {};
-      results.forEach(({ table, fields }) => {
-        fieldsData[table] = fields;
+      // 更新表字段状态
+      const newTableFields: { [table: string]: string[] } = {};
+      fieldsResults.forEach((result) => {
+        if (result.fields && result.fields.length > 0) {
+          newTableFields[result.table] = result.fields;
+        }
       });
 
-      setTableFields(fieldsData);
+      setTableFields(newTableFields);
+
+      return tables;
     } catch (error) {
-      console.error('处理表数据失败:', error);
+      console.error('处理表格数据时出错:', error);
+      return [];
     }
   };
 

@@ -36,6 +36,12 @@ export default [
     component: './Sync/Monitor',
     hideInMenu: true, // 不在菜单中显示
   },
+  {
+    name: 'backup',
+    icon: 'cloudUpload',
+    path: '/backup',
+    component: './Backup',
+  },
   { path: '/', redirect: '/dashboard' },
   {
     path: '/auth/google/callback',

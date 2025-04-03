@@ -58,5 +58,6 @@ export default {
   'menu.sync': 'Synchronization',
   'menu.settings': 'Settings',
   'menu.settings.authSettings': 'Authentication Settings',
+  'menu.backup': 'Data Backup',
   // Add other missing translation keys as needed
 };

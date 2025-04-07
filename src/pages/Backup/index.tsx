@@ -1531,26 +1531,34 @@ const JobList: React.FC = () => {
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setSearchText(value);
-    if (!value) {
+
+    // 在前端对已加载的数据进行过滤，不调用API
+    if (value) {
+      const filteredData = jobs.filter(
+        (job) =>
+          job.name.toLowerCase().includes(value.toLowerCase()) ||
+          job.database.database.toLowerCase().includes(value.toLowerCase()) ||
+          job.database.tables.some((table) => table.toLowerCase().includes(value.toLowerCase())) ||
+          job.destination.gcsPath.toLowerCase().includes(value.toLowerCase()),
+      );
+      setFilteredJobs(filteredData);
+    } else {
       setFilteredJobs(jobs);
     }
   };
 
-  // 处理按键事件，当用户按下Enter键时也触发搜索
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
-      // 聚焦到其他地方，关闭虚拟键盘
       if (searchInputRef.current) {
         searchInputRef.current.blur();
       }
     }
   };
 
-  // 重置搜索，清除后聚焦回搜索框
   const handleReset = () => {
     setSearchText('');
     setFilteredJobs(jobs);
-    // Focus back to search input after reset
+    // 重置后聚焦回搜索框
     if (searchInputRef.current) {
       searchInputRef.current.focus();
     }
@@ -1914,11 +1922,11 @@ const JobList: React.FC = () => {
           sourceType: sourceTypeValue, // 使用jobFormData中的sourceType
           host,
           port,
-          username: basicValues.username || '',
-          password: basicValues.password || '',
+          username: basicValues.username || (jobData ? jobData.database.username : ''),
+          password: basicValues.password || (jobData ? jobData.database.password : ''),
           database,
-          cronExpression: basicValues.cronExpression || '0 2 * * *',
-          fileType: basicValues.fileType || 'json',
+          cronExpression: basicValues.cronExpression || (jobData ? jobData.schedule : ''),
+          fileType: basicValues.fileType || (jobData ? jobData.fileType : 'json'),
           tables: [],
           selectedFields: {},
           gcsPath: '',

@@ -1223,7 +1223,7 @@ const JobList: React.FC = () => {
   const runJobNow = async (jobId: string) => {
     try {
       // 调用真实API
-      const response = await fetch(`/api/backup/${jobId}/run`, {
+      const response = await fetch(`/api/backup/execute/${jobId}`, {
         method: 'POST',
       });
 

@@ -59,5 +59,6 @@ export default {
   'menu.settings': 'Settings',
   'menu.settings.authSettings': 'Authentication Settings',
   'menu.backup': 'Data Backup',
+  'menu.account.sqlDebug': 'SQL Debug Tool',
   // Add other missing translation keys as needed
 };

@@ -10,20 +10,49 @@ import {
   Radio,
   Checkbox,
   Space,
-  Alert,
   Tooltip,
   Typography,
+  Statistic,
 } from 'antd';
 import {
-  ArrowRightOutlined,
   CheckCircleOutlined,
   ClockCircleOutlined,
   InfoCircleOutlined,
+  ExclamationCircleOutlined,
+  PlayCircleOutlined,
 } from '@ant-design/icons';
 import { Line } from '@ant-design/plots';
-import { fetchSyncMetrics } from '@/services/ant-design-pro/sync';
+import {
+  fetchSyncMetrics,
+  fetchChangeStreamsStatus,
+  type ChangeStreamItem,
+  type ChangeStreamsSummary,
+} from '@/services/ant-design-pro/sync';
+import { request } from '@umijs/max';
 import styles from './index.less';
 import { useIntl } from '@umijs/max';
+
+const { Text } = Typography;
+
+interface TrendDataItem {
+  time: string;
+  value: number;
+  type: string;
+  table?: string;
+  tableType: string;
+  color: string;
+}
+
+interface DisplayOptions {
+  showSource: boolean;
+  showTarget: boolean;
+  showDiff: boolean;
+}
+
+interface MetricsData {
+  rowCountTrend: any[];
+}
+
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const getOAuthConfig = async (provider = 'google') => {
   try {
@@ -44,14 +73,19 @@ const getOAuthConfig = async (provider = 'google') => {
   }
 };
 
-const { Text } = Typography;
-
 const Dashboard: React.FC = () => {
   const intl = useIntl();
-  const [metrics, setMetrics] = useState<any>({ rowCountTrend: [] });
+  const [metrics, setMetrics] = useState<MetricsData>({ rowCountTrend: [] });
+  const [changeStreamsData, setChangeStreamsData] = useState<{
+    changestreams: ChangeStreamItem[];
+    summary: ChangeStreamsSummary;
+    last_updated: string;
+    tasks_count: number;
+  } | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
+  const [changeStreamsLoading, setChangeStreamsLoading] = useState<boolean>(false);
   const [timeRange, setTimeRange] = useState<string>('1h');
-  const [displayOptions, setDisplayOptions] = useState({
+  const [displayOptions, setDisplayOptions] = useState<DisplayOptions>({
     showSource: true,
     showTarget: true,
     showDiff: true,
@@ -82,6 +116,30 @@ const Dashboard: React.FC = () => {
     fetchMetricsData();
   }, [timeRange]); // 当时间范围变化时重新获取数据
 
+  // 获取ChangeStreams状态数据
+  useEffect(() => {
+    const fetchChangeStreamsData = async () => {
+      setChangeStreamsLoading(true);
+      try {
+        const response = await fetchChangeStreamsStatus();
+        if (response.success && response.data) {
+          console.log('ChangeStreams数据:', response.data);
+          setChangeStreamsData(response.data);
+        }
+      } catch (error) {
+        console.error('获取ChangeStreams数据失败:', error);
+      } finally {
+        setChangeStreamsLoading(false);
+      }
+    };
+
+    fetchChangeStreamsData();
+
+    // 每30秒刷新一次数据
+    const interval = setInterval(fetchChangeStreamsData, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
   // 处理时间范围变化
   const handleTimeRangeChange = (e: any) => {
     setTimeRange(e.target.value);
@@ -96,7 +154,7 @@ const Dashboard: React.FC = () => {
   };
 
   // 参考 Monitor 页面的图表数据处理方式
-  const getFilteredChartData = () => {
+  const getFilteredChartData = (): TrendDataItem[] => {
     if (!metrics.rowCountTrend || metrics.rowCountTrend.length === 0) return [];
 
     // 根据复选框过滤数据
@@ -108,10 +166,10 @@ const Dashboard: React.FC = () => {
     });
 
     // 创建颜色映射
-    const colorMap = {};
+    const colorMap: Record<string, string> = {};
 
     // 处理数据，添加 tableType 字段用于图例显示
-    const rowCountFiltered = rowCountFilteredRaw.map((p: any) => {
+    const rowCountFiltered: TrendDataItem[] = rowCountFilteredRaw.map((p: any) => {
       if (!colorMap[p.table]) {
         colorMap[p.table] = p.table;
       }
@@ -125,117 +183,196 @@ const Dashboard: React.FC = () => {
     return rowCountFiltered;
   };
 
-  // 模拟数据
-  const dbSources = [
-    {
-      id: 'postgres1',
-      name: 'PostgreSQL (Primary)',
-      tables: ['users', 'orders', 'products'],
-      status: 'healthy',
-    },
-    { id: 'mysql1', name: 'MySQL (CRM)', tables: ['customers', 'interactions'], status: 'warning' },
-  ];
-
-  const dbTargets = [
-    { id: 'data-warehouse', name: 'DataHouse', type: 'Snowflake', status: 'healthy' },
-    { id: 'replica', name: 'Replication', type: 'PostgreSQL', status: 'healthy' },
-  ];
-
-  const syncFlows = [
-    {
-      id: 'flow1',
-      source: 'postgres1',
-      sourceTable: 'users',
-      target: 'data-warehouse',
-      targetTable: 'dim_users',
-      status: 'active',
-      latency: '1.2s',
-      changes: 256,
-      mappings: [
-        { source: 'ID', target: 'user_id' },
-        { source: 'email', target: 'email_address' },
-        { source: 'created_at', target: 'created_date' },
-      ],
-      transformations: ['data desensitization (email)'],
-      metrics: {
-        syncsToday: '12,583',
-        avgLatency: '1.3s',
-      },
-    },
-    {
-      id: 'flow2',
-      source: 'postgres1',
-      sourceTable: 'orders',
-      target: 'data-warehouse',
-      targetTable: 'fact_orders',
-      status: 'active',
-      latency: '1.5s',
-      changes: 1024,
-      mappings: [
-        { source: 'order_id', target: 'order_key' },
-        { source: 'customer_id', target: 'customer_key' },
-        { source: 'amount', target: 'order_amount' },
-      ],
-      transformations: ['data desensitization'],
-      metrics: {
-        syncsToday: '24,128',
-        avgLatency: '1.5s',
-      },
-    },
-    {
-      id: 'flow3',
-      source: 'mysql1',
-      sourceTable: 'customers',
-      target: 'replica',
-      targetTable: 'customers',
-      status: 'warning',
-      latency: '4.2s',
-      changes: 128,
-      mappings: [
-        { source: 'customer_id', target: 'customer_id' },
-        { source: 'name', target: 'name' },
-        { source: 'contact', target: 'contact' },
-      ],
-      transformations: ['Preserve the original structure'],
-      metrics: {
-        syncsToday: '4,892',
-        avgLatency: '4.2s',
-      },
-    },
-  ];
-
-  // 监控数据
-  const monitoringStats = {
-    syncStatus: '98.3%',
-    healthyFlows: '2/3',
-    currentLatency: '1.3s',
-    latencyChange: '-0.3s',
-    rowsSynced: '24,583',
-    rowsChange: '+18%',
+  // 获取ChangeStream状态颜色和图标
+  const getStreamStatus = (stream: ChangeStreamItem) => {
+    if (stream.errors > 0) {
+      return {
+        status: 'error',
+        color: 'red',
+        icon: <ExclamationCircleOutlined style={{ color: '#ff4d4f' }} />,
+        text: intl.formatMessage({ id: 'pages.dashboard.error' }),
+      };
+    }
+    if (stream.pending > 0 || stream.received > stream.executed) {
+      return {
+        status: 'processing',
+        color: 'blue',
+        icon: <PlayCircleOutlined style={{ color: '#1890ff' }} />,
+        text: intl.formatMessage({ id: 'pages.dashboard.processing' }),
+      };
+    }
+    return {
+      status: 'idle',
+      color: 'green',
+      icon: <CheckCircleOutlined style={{ color: '#52c41a' }} />,
+      text: intl.formatMessage({ id: 'pages.dashboard.idle' }),
+    };
   };
 
-  // 数据流表格列
-  const flowColumns = [
+  // 获取任务组的整体状态
+  const getTaskGroupStatus = (streams: ChangeStreamItem[]) => {
+    const hasErrors = streams.some((s) => s.errors > 0);
+    const hasProcessing = streams.some((s) => s.pending > 0 || s.received > s.executed);
+
+    if (hasErrors) {
+      return {
+        status: 'error',
+        color: 'red',
+        icon: <ExclamationCircleOutlined style={{ color: '#ff4d4f' }} />,
+        text: intl.formatMessage({ id: 'pages.dashboard.error' }),
+      };
+    }
+    if (hasProcessing) {
+      return {
+        status: 'processing',
+        color: 'blue',
+        icon: <PlayCircleOutlined style={{ color: '#1890ff' }} />,
+        text: intl.formatMessage({ id: 'pages.dashboard.processing' }),
+      };
+    }
+    return {
+      status: 'idle',
+      color: 'green',
+      icon: <CheckCircleOutlined style={{ color: '#52c41a' }} />,
+      text: intl.formatMessage({ id: 'pages.dashboard.idle' }),
+    };
+  };
+
+  // 按Task ID分组ChangeStreams
+  const groupedChangeStreams = React.useMemo(() => {
+    if (!changeStreamsData?.changestreams) return {};
+
+    return changeStreamsData.changestreams.reduce(
+      (groups, stream) => {
+        const taskId = stream.task_id;
+        if (!groups[taskId]) {
+          groups[taskId] = [];
+        }
+        groups[taskId].push(stream);
+        return groups;
+      },
+      {} as Record<string, ChangeStreamItem[]>,
+    );
+  }, [changeStreamsData?.changestreams]);
+
+  // 展开状态管理
+  const [expandedTasks, setExpandedTasks] = useState<string[]>([]);
+
+  // 任务组表格列
+  const taskGroupColumns = [
     {
-      title: intl.formatMessage({ id: 'pages.dashboard.dataFlow' }),
-      dataIndex: 'flow',
-      key: 'flow',
-      render: (_, record) => {
-        const source = dbSources.find((s) => s.id === record.source);
-        const sourceTable = record.sourceTable;
-        const targetTable = record.targetTable;
+      title: intl.formatMessage({ id: 'pages.dashboard.taskId' }),
+      dataIndex: 'taskId',
+      key: 'taskId',
+      width: 80,
+      render: (taskId: string) => <Tag color="blue">{taskId}</Tag>,
+    },
+    {
+      title: intl.formatMessage({ id: 'pages.dashboard.status' }),
+      dataIndex: 'status',
+      key: 'status',
+      width: 100,
+      render: (_: any, record: any) => {
+        const statusInfo = getTaskGroupStatus(record.streams);
         return (
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center' }}>
-              <Text strong>{source?.name}</Text>
-              <ArrowRightOutlined style={{ margin: '0 8px' }} />
-              <Text>{dbTargets.find((t) => t.id === record.target)?.name}</Text>
-            </div>
-            <div>
-              <Text type="secondary">
-                {sourceTable} → {targetTable}
-              </Text>
-            </div>
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            {statusInfo.icon}
+            <Tag color={statusInfo.color} style={{ marginLeft: 4 }}>
+              {statusInfo.text}
+            </Tag>
+          </div>
+        );
+      },
+    },
+    {
+      title: intl.formatMessage({ id: 'pages.dashboard.streamCount' }),
+      dataIndex: 'streamCount',
+      key: 'streamCount',
+      width: 80,
+      render: (count: number) => <Statistic value={count} valueStyle={{ fontSize: '12px' }} />,
+    },
+    {
+      title: intl.formatMessage({ id: 'pages.dashboard.totalReceived' }),
+      dataIndex: 'totalReceived',
+      key: 'totalReceived',
+      width: 80,
+      render: (total: number) => <Statistic value={total} valueStyle={{ fontSize: '12px' }} />,
+    },
+    {
+      title: intl.formatMessage({ id: 'pages.dashboard.totalExecuted' }),
+      dataIndex: 'totalExecuted',
+      key: 'totalExecuted',
+      width: 80,
+      render: (total: number) => <Statistic value={total} valueStyle={{ fontSize: '12px' }} />,
+    },
+    {
+      title: intl.formatMessage({ id: 'pages.dashboard.totalInserted' }),
+      dataIndex: 'totalInserted',
+      key: 'totalInserted',
+      width: 70,
+      render: (total: number) => (
+        <Statistic value={total} valueStyle={{ fontSize: '12px', color: '#52c41a' }} />
+      ),
+    },
+    {
+      title: intl.formatMessage({ id: 'pages.dashboard.totalUpdated' }),
+      dataIndex: 'totalUpdated',
+      key: 'totalUpdated',
+      width: 70,
+      render: (total: number) => (
+        <Statistic value={total} valueStyle={{ fontSize: '12px', color: '#1890ff' }} />
+      ),
+    },
+    {
+      title: intl.formatMessage({ id: 'pages.dashboard.totalDeleted' }),
+      dataIndex: 'totalDeleted',
+      key: 'totalDeleted',
+      width: 70,
+      render: (total: number) => (
+        <Statistic value={total} valueStyle={{ fontSize: '12px', color: '#ff7a45' }} />
+      ),
+    },
+    {
+      title: intl.formatMessage({ id: 'pages.dashboard.pending' }),
+      dataIndex: 'totalPending',
+      key: 'totalPending',
+      width: 70,
+      render: (total: number) => (
+        <Statistic
+          value={total}
+          valueStyle={{ fontSize: '12px', color: total > 0 ? '#faad14' : '#52c41a' }}
+        />
+      ),
+    },
+    {
+      title: intl.formatMessage({ id: 'pages.dashboard.errors' }),
+      dataIndex: 'totalErrors',
+      key: 'totalErrors',
+      width: 70,
+      render: (total: number) => (
+        <Statistic
+          value={total}
+          valueStyle={{ fontSize: '12px', color: total > 0 ? '#ff4d4f' : '#52c41a' }}
+        />
+      ),
+    },
+  ];
+
+  // 详细流表格列
+  const streamDetailColumns = [
+    {
+      title: intl.formatMessage({ id: 'pages.dashboard.streamName' }),
+      dataIndex: 'name',
+      key: 'name',
+      render: (name: string) => {
+        const [database, table] = name.split('.');
+        return (
+          <div style={{ paddingLeft: 24 }}>
+            <Text strong>{table}</Text>
+            <br />
+            <Text type="secondary" style={{ fontSize: '12px' }}>
+              {database}
+            </Text>
           </div>
         );
       },
@@ -244,101 +381,107 @@ const Dashboard: React.FC = () => {
       title: intl.formatMessage({ id: 'pages.dashboard.status' }),
       dataIndex: 'status',
       key: 'status',
-      render: (status) => {
-        const statusMap = {
-          active: {
-            color: 'green',
-            text: intl.formatMessage({ id: 'pages.dashboard.active' }),
-          },
-          warning: {
-            color: 'yellow',
-            text: intl.formatMessage({ id: 'pages.dashboard.warning' }),
-          },
-          error: {
-            color: 'red',
-            text: intl.formatMessage({ id: 'pages.dashboard.error' }),
-          },
-          paused: {
-            color: 'gray',
-            text: intl.formatMessage({ id: 'pages.dashboard.paused' }),
-          },
-        };
-        const { color, text } = statusMap[status] || { color: 'blue', text: status };
-        return <Tag color={color}>{text}</Tag>;
+      render: (_: any, record: ChangeStreamItem) => {
+        const statusInfo = getStreamStatus(record);
+        return (
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            {statusInfo.icon}
+            <Tag color={statusInfo.color} style={{ marginLeft: 8 }}>
+              {statusInfo.text}
+            </Tag>
+          </div>
+        );
       },
     },
     {
-      title: intl.formatMessage({ id: 'pages.dashboard.latency' }),
-      dataIndex: 'latency',
-      key: 'latency',
-      render: (latency) => (
-        <div style={{ display: 'flex', alignItems: 'center' }}>
-          <ClockCircleOutlined style={{ marginRight: 8 }} />
-          <span>{latency}</span>
-        </div>
+      title: intl.formatMessage({ id: 'pages.dashboard.received' }),
+      dataIndex: 'received',
+      key: 'received',
+      render: (received: number) => (
+        <Statistic value={received} valueStyle={{ fontSize: '14px' }} />
       ),
     },
     {
-      title: intl.formatMessage({ id: 'pages.dashboard.changesCount' }),
-      dataIndex: 'changes',
-      key: 'changes',
+      title: intl.formatMessage({ id: 'pages.dashboard.executed' }),
+      dataIndex: 'executed',
+      key: 'executed',
+      render: (executed: number) => (
+        <Statistic value={executed} valueStyle={{ fontSize: '14px' }} />
+      ),
+    },
+    {
+      title: intl.formatMessage({ id: 'pages.dashboard.inserted' }),
+      dataIndex: 'inserted',
+      key: 'inserted',
+      render: (_: any, record: ChangeStreamItem) => (
+        <Statistic
+          value={record.operations?.inserted || 0}
+          valueStyle={{ fontSize: '14px', color: '#52c41a' }}
+        />
+      ),
+    },
+    {
+      title: intl.formatMessage({ id: 'pages.dashboard.updated' }),
+      dataIndex: 'updated',
+      key: 'updated',
+      render: (_: any, record: ChangeStreamItem) => (
+        <Statistic
+          value={record.operations?.updated || 0}
+          valueStyle={{ fontSize: '14px', color: '#1890ff' }}
+        />
+      ),
+    },
+    {
+      title: intl.formatMessage({ id: 'pages.dashboard.deleted' }),
+      dataIndex: 'deleted',
+      key: 'deleted',
+      render: (_: any, record: ChangeStreamItem) => (
+        <Statistic
+          value={record.operations?.deleted || 0}
+          valueStyle={{ fontSize: '14px', color: '#ff7a45' }}
+        />
+      ),
+    },
+    {
+      title: intl.formatMessage({ id: 'pages.dashboard.pending' }),
+      dataIndex: 'pending',
+      key: 'pending',
+      render: (pending: number) => (
+        <Statistic
+          value={pending}
+          valueStyle={{ fontSize: '14px', color: pending > 0 ? '#faad14' : '#52c41a' }}
+        />
+      ),
+    },
+    {
+      title: intl.formatMessage({ id: 'pages.dashboard.errors' }),
+      dataIndex: 'errors',
+      key: 'errors',
+      render: (errors: number) => (
+        <Statistic
+          value={errors}
+          valueStyle={{ fontSize: '14px', color: errors > 0 ? '#ff4d4f' : '#52c41a' }}
+        />
+      ),
     },
   ];
 
-  // 展开行渲染函数
-  const expandedRowRender = (record) => {
-    return (
-      <div className={styles.expandedRow}>
-        <Row gutter={24}>
-          <Col span={8}>
-            <Card
-              title={intl.formatMessage({ id: 'pages.dashboard.mappings' })}
-              className={styles.expandCard}
-            >
-              {record.mappings &&
-                record.mappings.map((mapping, index) => (
-                  <div key={index} className={styles.mappingItem}>
-                    <Text>{mapping.source}</Text>
-                    <ArrowRightOutlined style={{ margin: '0 8px' }} />
-                    <Text>{mapping.target}</Text>
-                  </div>
-                ))}
-            </Card>
-          </Col>
-          <Col span={8}>
-            <Card
-              title={intl.formatMessage({ id: 'pages.dashboard.transformations' })}
-              className={styles.expandCard}
-            >
-              {record.transformations &&
-                record.transformations.map((transform, index) => (
-                  <div key={index} className={styles.transformItem}>
-                    <Text>{transform}</Text>
-                  </div>
-                ))}
-            </Card>
-          </Col>
-          <Col span={8}>
-            <Card
-              title={intl.formatMessage({ id: 'pages.dashboard.metrics' })}
-              className={styles.expandCard}
-            >
-              <>
-                <div className={styles.metricItem}>
-                  <strong>{intl.formatMessage({ id: 'pages.dashboard.syncsToday' })}:</strong>{' '}
-                  {record.metrics.syncsToday}
-                </div>
-                <div className={styles.metricItem}>
-                  <strong>{intl.formatMessage({ id: 'pages.dashboard.avgLatency' })}:</strong>{' '}
-                  {record.metrics.avgLatency}
-                </div>
-              </>
-            </Card>
-          </Col>
-        </Row>
-      </div>
-    );
-  };
+  // 准备表格数据
+  const taskGroupData = React.useMemo(() => {
+    return Object.entries(groupedChangeStreams).map(([taskId, streams]) => ({
+      key: taskId,
+      taskId,
+      streams,
+      streamCount: streams.length,
+      totalReceived: streams.reduce((sum, s) => sum + s.received, 0),
+      totalExecuted: streams.reduce((sum, s) => sum + s.executed, 0),
+      totalInserted: streams.reduce((sum, s) => sum + (s.operations?.inserted || 0), 0),
+      totalUpdated: streams.reduce((sum, s) => sum + (s.operations?.updated || 0), 0),
+      totalDeleted: streams.reduce((sum, s) => sum + (s.operations?.deleted || 0), 0),
+      totalPending: streams.reduce((sum, s) => sum + s.pending, 0),
+      totalErrors: streams.reduce((sum, s) => sum + s.errors, 0),
+    }));
+  }, [groupedChangeStreams]);
 
   // 完全按照 Monitor 页面的图表配置
   const rowCountTrendConfig = {
@@ -360,7 +503,7 @@ const Dashboard: React.FC = () => {
       },
     },
     legend: { position: 'top' },
-    height: 300,
+    height: 280,
   };
 
   const checkOAuthConfig = async () => {
@@ -386,23 +529,16 @@ const Dashboard: React.FC = () => {
   return (
     <PageContainer
       title={intl.formatMessage({ id: 'pages.dashboard.title' })}
-      content={
-        <Alert
-          message={intl.formatMessage({ id: 'pages.dashboard.dataNotice' })}
-          description={intl.formatMessage({ id: 'pages.dashboard.dataNoticeDetail' })}
-          type="info"
-          showIcon
-          style={{ marginBottom: 24 }}
-        />
-      }
+      className={styles.dashboardContainer}
     >
-      <Row gutter={24}>
-        <Col span={8}>
-          <Card className={styles.statCard} bordered={false}>
+      {/* 统计卡片 */}
+      <Row gutter={24} className={styles.statsRow}>
+        <Col span={6}>
+          <Card className={styles.statCard} bordered={false} loading={changeStreamsLoading}>
             <div className={styles.statContent}>
               <div className={styles.statTitle}>
-                {intl.formatMessage({ id: 'pages.dashboard.syncStatus' })}
-                <Tooltip title={intl.formatMessage({ id: 'pages.dashboard.mockDataHint' })}>
+                {intl.formatMessage({ id: 'pages.dashboard.activeStreams' })}
+                <Tooltip title={intl.formatMessage({ id: 'pages.dashboard.realDataHint' })}>
                   <span style={{ display: 'inline-block' }}>
                     <InfoCircleOutlined style={{ marginLeft: 8, color: '#999' }} />
                   </span>
@@ -410,60 +546,140 @@ const Dashboard: React.FC = () => {
               </div>
               <div className={styles.statValue}>
                 <CheckCircleOutlined style={{ color: '#3f8600', marginRight: '8px' }} />
-                {monitoringStats.syncStatus}
+                {changeStreamsData?.summary.active_streams || 0}
               </div>
               <div className={styles.statFooter}>
-                {monitoringStats.healthyFlows}{' '}
-                {intl.formatMessage({ id: 'pages.dashboard.healthyFlows' })}
+                {intl.formatMessage(
+                  { id: 'pages.dashboard.totalTasks' },
+                  {
+                    count: changeStreamsData?.tasks_count || 0,
+                  },
+                )}
               </div>
             </div>
           </Card>
         </Col>
-        <Col span={8}>
-          <Card className={styles.statCard} bordered={false}>
+        <Col span={6}>
+          <Card className={styles.statCard} bordered={false} loading={changeStreamsLoading}>
             <div className={styles.statContent}>
               <div className={styles.statTitle}>
-                {intl.formatMessage({ id: 'pages.dashboard.currentLatency' })}
+                {intl.formatMessage({ id: 'pages.dashboard.processingRate' })}
               </div>
               <div className={styles.statValue}>
                 <ClockCircleOutlined style={{ color: '#1890ff', marginRight: '8px' }} />
-                {monitoringStats.currentLatency}
+                {changeStreamsData?.summary.processing_rate || '0/sec'}
               </div>
-              <div className={styles.statFooter} style={{ color: '#3f8600' }}>
-                ↓ {monitoringStats.latencyChange}{' '}
-                {intl.formatMessage({ id: 'pages.dashboard.comparedLastWeek' })}
+              <div className={styles.statFooter}>
+                {intl.formatMessage({ id: 'pages.dashboard.realTime' })}
               </div>
             </div>
           </Card>
         </Col>
-        <Col span={8}>
-          <Card className={styles.statCard} bordered={false}>
+        <Col span={6}>
+          <Card className={styles.statCard} bordered={false} loading={changeStreamsLoading}>
             <div className={styles.statContent}>
               <div className={styles.statTitle}>
-                {intl.formatMessage({ id: 'pages.dashboard.rowsSyncedToday' })}
+                {intl.formatMessage({ id: 'pages.dashboard.totalExecuted' })}
               </div>
-              <div className={styles.statValue}>{monitoringStats.rowsSynced}</div>
-              <div className={styles.statFooter} style={{ color: '#cf1322' }}>
-                ↑ {monitoringStats.rowsChange}{' '}
-                {intl.formatMessage({ id: 'pages.dashboard.comparedLastWeek' })}
+              <div className={styles.statValue}>
+                {changeStreamsData?.summary.total_executed?.toLocaleString() || '0'}
+              </div>
+              <div className={styles.statFooter}>
+                {intl.formatMessage(
+                  { id: 'pages.dashboard.totalPending' },
+                  {
+                    count: changeStreamsData?.summary.total_pending || 0,
+                  },
+                )}
+              </div>
+            </div>
+          </Card>
+        </Col>
+        <Col span={6}>
+          <Card className={styles.statCard} bordered={false} loading={changeStreamsLoading}>
+            <div className={styles.statContent}>
+              <div className={styles.statTitle}>
+                {intl.formatMessage({ id: 'pages.dashboard.totalReceived' })}
+              </div>
+              <div className={styles.statValue}>
+                {changeStreamsData?.summary.total_received?.toLocaleString() || '0'}
+              </div>
+              <div className={styles.statFooter} style={{ fontSize: '10px', lineHeight: '1.1' }}>
+                {changeStreamsData?.last_updated
+                  ? intl.formatMessage(
+                      { id: 'pages.dashboard.lastUpdated' },
+                      {
+                        time: new Date(changeStreamsData.last_updated).toLocaleString('ja-JP', {
+                          timeZone: 'Asia/Tokyo',
+                          year: 'numeric',
+                          month: '2-digit',
+                          day: '2-digit',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          second: '2-digit',
+                        }),
+                      },
+                    )
+                  : intl.formatMessage({ id: 'pages.dashboard.noData' })}
               </div>
             </div>
           </Card>
         </Col>
       </Row>
 
+      {/* Active ChangeStreams */}
+      <Card
+        title={intl.formatMessage({ id: 'pages.dashboard.activeChangeStreams' })}
+        className={styles.sectionCard}
+      >
+        <div>
+          {/* 任务组汇总表格 */}
+          <Table
+            columns={taskGroupColumns}
+            dataSource={taskGroupData}
+            rowKey="taskId"
+            loading={changeStreamsLoading}
+            pagination={false}
+            size="small"
+            className={styles.taskGroupSummary}
+            expandable={{
+              expandedRowKeys: expandedTasks,
+              onExpandedRowsChange: (keys) => setExpandedTasks(keys as string[]),
+              expandedRowRender: (record) => (
+                <div style={{ margin: 0 }}>
+                  <div
+                    style={{
+                      marginBottom: 8,
+                      paddingLeft: 24,
+                      display: 'flex',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <Text type="secondary">
+                      {intl.formatMessage({ id: 'pages.dashboard.streamDetails' })}
+                    </Text>
+                  </div>
+                  <Table
+                    columns={streamDetailColumns}
+                    dataSource={record.streams}
+                    rowKey="name"
+                    pagination={false}
+                    size="small"
+                    className={styles.streamDetailTable}
+                    showHeader={true}
+                    style={{ marginLeft: 24 }}
+                  />
+                </div>
+              ),
+            }}
+          />
+        </div>
+      </Card>
+
       {/* 表行数趋势图 */}
       <Card
-        title={
-          <span>
-            {intl.formatMessage({ id: 'pages.dashboard.tableRowCountTrend' })}
-            <Tag color="green" style={{ marginLeft: 8 }}>
-              {intl.formatMessage({ id: 'pages.dashboard.realData' })}
-            </Tag>
-          </span>
-        }
-        className={styles.trendCard}
-        style={{ marginTop: 24, marginBottom: 24 }}
+        title={intl.formatMessage({ id: 'pages.dashboard.tableRowCountTrend' })}
+        className={styles.sectionCard}
       >
         <div className={styles.chartControls}>
           <div className={styles.timeRangeSelector}>
@@ -531,30 +747,6 @@ const Dashboard: React.FC = () => {
         ) : (
           <Line {...rowCountTrendConfig} />
         )}
-      </Card>
-
-      <Card
-        title={
-          <span>
-            {intl.formatMessage({ id: 'pages.dashboard.activeDataFlows' })}
-            <Tooltip title={intl.formatMessage({ id: 'pages.dashboard.mockDataHint' })}>
-              <InfoCircleOutlined style={{ marginLeft: 8, color: '#999' }} />
-            </Tooltip>
-          </span>
-        }
-        className={styles.dataFlowCard}
-        style={{ marginTop: 24 }}
-      >
-        <Table
-          columns={flowColumns}
-          dataSource={syncFlows}
-          rowKey="id"
-          expandable={{
-            expandedRowRender,
-            expandRowByClick: true,
-          }}
-          pagination={false}
-        />
       </Card>
     </PageContainer>
   );

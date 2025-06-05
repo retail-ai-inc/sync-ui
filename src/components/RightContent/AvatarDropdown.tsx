@@ -6,6 +6,7 @@ import {
   LockOutlined,
   TeamOutlined,
   SafetyOutlined,
+  CodeOutlined,
 } from '@ant-design/icons';
 import { history, useModel } from '@umijs/max';
 import { Spin } from 'antd';
@@ -103,6 +104,11 @@ export const AvatarDropdown: React.FC<GlobalHeaderRightProps> = ({ menu, childre
       history.push('/settings/auth');
       return;
     }
+    // 处理SQL Debug Tool菜单项点击
+    if (key === 'sqlDebug') {
+      history.push('/sql-debug');
+      return;
+    }
     history.push(`/account/${key}`);
   };
 
@@ -131,7 +137,7 @@ export const AvatarDropdown: React.FC<GlobalHeaderRightProps> = ({ menu, childre
   // 检查用户是否为管理员
   const isAdmin = currentUser && currentUser.access === 'admin';
 
-  const menuItems: ItemType[] = [
+  const menuItems: MenuProps['items'] = [
     ...(menu
       ? [
           {
@@ -166,6 +172,11 @@ export const AvatarDropdown: React.FC<GlobalHeaderRightProps> = ({ menu, childre
             key: 'authSettings',
             icon: <SafetyOutlined />,
             label: intl.formatMessage({ id: 'menu.account.authSettings' }),
+          },
+          {
+            key: 'sqlDebug',
+            icon: <CodeOutlined />,
+            label: intl.formatMessage({ id: 'menu.account.sqlDebug' }),
           },
         ]
       : []),

@@ -56,4 +56,5 @@ export default {
   'menu.account.authSettings': 'Authentication Settings',
   'menu.SQLDebugTool': 'SQL Debug Tool',
   'menu.backup': '数据备份',
+  'menu.account.sqlDebug': 'SQL Debug Tool',
 };

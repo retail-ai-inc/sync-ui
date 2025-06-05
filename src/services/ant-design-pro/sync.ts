@@ -165,3 +165,45 @@ export async function fetchSyncTables(id: number) {
     method: 'GET',
   });
 }
+
+/**
+ * GET /api/changestreams/status
+ * 获取 ChangeStreams 状态信息
+ */
+export interface ChangeStreamItem {
+  errors: number;
+  executed: number;
+  name: string;
+  pending: number;
+  received: number;
+  task_id: string;
+  operations?: {
+    deleted: number;
+    inserted: number;
+    updated: number;
+  };
+}
+
+export interface ChangeStreamsSummary {
+  active_streams: number;
+  processing_rate: string;
+  total_executed: number;
+  total_pending: number;
+  total_received: number;
+}
+
+export interface ChangeStreamsResponse {
+  success: boolean;
+  data: {
+    changestreams: ChangeStreamItem[];
+    last_updated: string;
+    summary: ChangeStreamsSummary;
+    tasks_count: number;
+  };
+}
+
+export async function fetchChangeStreamsStatus() {
+  return request<ChangeStreamsResponse>('/api/changestreams/status', {
+    method: 'GET',
+  });
+}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   StepsForm,
   ProFormText,
@@ -14,10 +14,25 @@ import {
   Switch,
   Table,
   Typography,
-  Collapse,
   Spin,
+  Select,
+  Row,
+  Col,
+  Input,
+  Tabs,
+  Badge,
+  Empty,
 } from 'antd';
-import { LockOutlined, EyeInvisibleOutlined } from '@ant-design/icons';
+import {
+  LockOutlined,
+  EyeInvisibleOutlined,
+  DeleteOutlined,
+  PlusOutlined,
+  FilterOutlined,
+  SecurityScanOutlined,
+  SettingOutlined,
+  TableOutlined,
+} from '@ant-design/icons';
 import type { TransferDirection } from 'antd/es/transfer';
 import type { FormInstance } from 'antd';
 import type { Key } from 'antd/es/table/interface';
@@ -36,6 +51,19 @@ interface TableItem {
   sourceTable: string;
   targetTable: string;
   fieldSecurity?: FieldSecurityOption[];
+  countQuery?: {
+    enabled: boolean;
+    conditions?: Array<{
+      table: string;
+      field: string;
+      operator: string;
+      value: string;
+    }>;
+  };
+  advancedSettings?: {
+    syncIndexes?: boolean;
+    ignoreDeleteOps?: boolean;
+  };
 }
 
 interface MappingBlock {
@@ -60,6 +88,10 @@ interface SyncRecord {
   lastUpdateTime?: string;
   securityEnabled?: boolean;
 
+  // Advanced settings are now part of mappings.tables[].advancedSettings
+  // syncIndexes?: boolean;
+  // monitorDelete?: boolean;
+
   // Potential DB-specific parameters if the record is loaded for editing
   pg_replication_slot?: string;
   pg_plugin?: string;
@@ -70,11 +102,11 @@ interface SyncRecord {
   redis_position_path?: string;
 }
 
-// 全局变量来储存 sourceType
+// 全局变量存储源数据库类型和连接信息
 let globalSourceType = '';
 let globalSourceConn: SyncConn | null = null;
 
-// 工具方法：生成当前时间字符串 "YYYY-MM-DD HH:mm:ss"
+// 生成当前时间字符串
 const getCurrentTimeString = () => {
   const now = new Date();
   const pad = (num: number) => String(num).padStart(2, '0');
@@ -89,7 +121,6 @@ interface AddSyncProps {
   onCancel: () => void;
 }
 
-// 添加安全选项类型定义
 interface FieldSecurityOption {
   field: string;
   securityType: 'encrypted' | 'masked';
@@ -103,16 +134,24 @@ interface FieldOption {
 interface TableSchemaComponentProps {
   table: any[];
   advancedSecurityEnabled: boolean;
+  tableName: string;
 }
 
 const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
   const [targetKeys, setTargetKeys] = useState<string[]>([]);
   const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
-  // 后端返回的真实表数据（第四步需要的表列表）
   const [tableData, setTableData] = useState<{ key: string; title: string; description: string }[]>(
     [],
   );
-  const [showSecurityOptions, setShowSecurityOptions] = useState(false);
+  const [conditions, setConditions] = useState<
+    Array<{
+      table: string;
+      field: string;
+      operator: string;
+      value: string;
+    }>
+  >([]);
+
   const formRef = useRef<FormInstance>();
   const [fieldsMockData, setFieldsMockData] = useState<Record<string, any[]>>({});
   const [isLoadingFields, setIsLoadingFields] = useState(false);
@@ -121,14 +160,19 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
     sourceType: string;
     sourceConn: SyncConn;
   } | null>(null);
-
-  // 添加 intl 实例
-  const intl = useIntl();
-
-  // 添加新的状态来存储表的安全选项
+  const [activeTabKey, setActiveTabKey] = useState<string>('overview');
   const [tablesSecurityOptions, setTablesSecurityOptions] = useState<
     Record<string, Record<string, FieldOption>>
   >({});
+  const [currentQueryTable, setCurrentQueryTable] = useState<string>('');
+  const [currentQueryField, setCurrentQueryField] = useState<string>('');
+  const [currentQueryOperator, setCurrentQueryOperator] = useState<string>('=');
+  const [currentQueryValue, setCurrentQueryValue] = useState<string>('');
+  const [tableAdvancedSettings, setTableAdvancedSettings] = useState<
+    Record<string, { syncIndexes: boolean; ignoreDeleteOps: boolean }>
+  >({});
+
+  const intl = useIntl();
 
   // 编辑任务时，根据 record.mappings 初始化 Transfer 选择
   useEffect(() => {
@@ -137,28 +181,74 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
       if (firstMapping.tables && firstMapping.tables.length > 0) {
         const keys = firstMapping.tables.map((t) => t.sourceTable);
         setTargetKeys(keys);
+
+        // 同时设置当前查询表为第一个表
+        setCurrentQueryTable(keys[0]);
       } else {
         setTargetKeys([]);
+        setCurrentQueryTable('');
       }
     } else {
       setTargetKeys([]);
+      setCurrentQueryTable('');
+    }
+  }, [record]);
+
+  // 初始化查询条件
+  useEffect(() => {
+    if (record && record.mappings && record.mappings.length > 0) {
+      const firstMapping = record.mappings[0];
+      if (firstMapping.tables && firstMapping.tables.length > 0) {
+        const allConditions: Array<{
+          table: string;
+          field: string;
+          operator: string;
+          value: string;
+        }> = [];
+
+        firstMapping.tables.forEach((table) => {
+          if (table.countQuery?.conditions && table.countQuery.conditions.length > 0) {
+            table.countQuery.conditions.forEach((condition) => {
+              allConditions.push(condition);
+            });
+          } else if (table.countQuery?.enabled) {
+            // 兼容旧数据格式
+            if ((table.countQuery as any).companyId) {
+              allConditions.push({
+                table: table.sourceTable,
+                field: 'companyId',
+                operator: '=',
+                value: (table.countQuery as any).companyId,
+              });
+            }
+
+            if ((table.countQuery as any).dateField) {
+              allConditions.push({
+                table: table.sourceTable,
+                field: (table.countQuery as any).dateField,
+                operator: 'dateRange',
+                value: (table.countQuery as any).dateRange || 'daily',
+              });
+            }
+          }
+        });
+
+        if (allConditions.length > 0) {
+          setConditions(allConditions);
+        }
+      }
     }
   }, [record]);
 
   // 获取表结构信息的函数
   const fetchTableSchema = async (tableName: string) => {
-    console.log('fetchTableSchema调用，tableName:', tableName);
-    console.log('全局变量状态:', { globalSourceType, globalSourceConn });
-
     // Redis 不需要获取表结构
     if (globalSourceType === 'redis') {
-      console.log('Redis 数据库不需要获取表结构');
       return;
     }
 
     // 首先尝试使用全局变量
     if (globalSourceType && globalSourceConn) {
-      console.log('使用全局变量获取表结构');
       setIsLoadingFields(true);
       try {
         const response = await getTableSchema({
@@ -173,41 +263,28 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
           tableName,
         });
 
-        console.log('API返回的表结构数据:', response);
-
         if (response.success && response.data.fields) {
-          // 转换API返回的数据格式为组件需要的格式，添加_tableName属性标记来源表
           const fieldData = response.data.fields.map((field: any) => ({
             key: `${tableName}_${field.name}`,
             fieldName: field.name,
             fieldType: field.type,
             status: 'normal',
-            _tableName: tableName, // 添加表名标记，确保不会混淆
+            _tableName: tableName,
           }));
 
-          console.log('转换后的字段数据:', fieldData);
-
-          setFieldsMockData((prev) => {
-            const newData = {
-              ...prev,
-              [tableName]: fieldData,
-            };
-            console.log('更新后的fieldsMockData:', newData);
-            return newData;
-          });
+          setFieldsMockData((prev) => ({
+            ...prev,
+            [tableName]: fieldData,
+          }));
         } else {
-          console.error('API返回错误或无字段数据:', response);
           message.error(intl.formatMessage({ id: 'pages.syncSettings.fetchFieldsFailed' }));
         }
       } catch (error) {
-        console.error('获取表结构出错:', error);
         message.error(intl.formatMessage({ id: 'pages.syncSettings.fetchFieldsFailed' }));
       } finally {
         setIsLoadingFields(false);
       }
     } else if (sourceConnectionInfo) {
-      // 如果全局变量不可用，尝试使用state
-      console.log('使用state获取表结构');
       const { sourceType, sourceConn } = sourceConnectionInfo;
 
       if (
@@ -236,12 +313,11 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
         });
 
         if (response.success && response.data.fields) {
-          // 转换API返回的数据格式为组件需要的格式
           const fieldData = response.data.fields.map((field: any) => ({
             key: `${tableName}_${field.name}`,
-            name: field.name,
-            type: field.type,
-            status: 'normal', // 默认为正常状态
+            fieldName: field.name,
+            fieldType: field.type,
+            status: 'normal',
           }));
 
           setFieldsMockData((prev) => ({
@@ -252,40 +328,48 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
           message.error(intl.formatMessage({ id: 'pages.syncSettings.fetchFieldsFailed' }));
         }
       } catch (error) {
-        console.error('获取表结构出错:', error);
         message.error(intl.formatMessage({ id: 'pages.syncSettings.fetchFieldsFailed' }));
       } finally {
         setIsLoadingFields(false);
       }
     } else {
-      console.error('无法获取连接信息');
       message.error(intl.formatMessage({ id: 'pages.syncSettings.missingConnectionInfo' }));
     }
   };
 
-  // 修改穿梭框变更处理函数的类型，使其匹配 Transfer 所需类型
+  // 穿梭框变更处理函数
   const onTransferChange = (
     newTargetKeys: Key[],
-    direction: TransferDirection,
-    moveKeys: Key[],
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _direction: TransferDirection,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _moveKeys: Key[],
   ) => {
-    console.log('onTransferChange被调用:', { newTargetKeys, direction, moveKeys });
-    // 转换为 string[] 类型
     setTargetKeys(newTargetKeys as string[]);
 
-    // 找出新增的表，并获取它们的字段信息
+    // 找出新增的表，并获取它们的字段信息和设置默认的高级设置
     const addedTables = (newTargetKeys as string[]).filter((key) =>
       targetKeys ? !targetKeys.includes(key) : true,
     );
 
-    console.log('新增表:', addedTables, '当前已选表:', targetKeys);
-
     if (addedTables.length > 0) {
-      // 使用setTimeout确保表单值已更新
+      // 为新表设置默认的高级设置
+      setTableAdvancedSettings((prev) => {
+        const newSettings = { ...prev };
+        addedTables.forEach((tableName) => {
+          if (!newSettings[tableName]) {
+            newSettings[tableName] = {
+              syncIndexes: false,
+              ignoreDeleteOps: false,
+            };
+          }
+        });
+        return newSettings;
+      });
+
+      // 获取新增表的字段信息
       setTimeout(() => {
         addedTables.forEach((tableName) => {
-          console.log('准备获取表结构:', tableName);
-          // 添加对 Redis 类型的检查，Redis 不需要获取表结构
           if (globalSourceType !== 'redis') {
             fetchTableSchema(tableName);
           }
@@ -294,19 +378,11 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
     }
   };
 
-  // 使用step name来确定当前步骤，而不是依赖索引
+  // 当进入表映射步骤时，加载表数据和字段信息
   useEffect(() => {
-    // 检查当前是否处于表映射步骤
     if (currentStep === 3) {
-      // 假设第4步索引为3
-      console.log('进入第4步, 状态检查:');
-      console.log('全局变量:', { globalSourceType, globalSourceConn });
-      console.log('targetKeys:', targetKeys);
-      console.log('tableData:', tableData);
-
       // 如果没有表数据但有连接信息，尝试加载表数据
       if (tableData.length === 0 && globalSourceType && globalSourceConn) {
-        console.log('尝试加载表数据');
         const payload = {
           dbType: globalSourceType,
           host: globalSourceConn.host,
@@ -333,8 +409,8 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
               setTableData(newTableData);
             }
           })
-          .catch((error) => {
-            console.error('加载表数据失败:', error);
+          .catch(() => {
+            // 静默处理错误
           });
       }
 
@@ -342,7 +418,6 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
       if (targetKeys && targetKeys.length > 0) {
         targetKeys.forEach((tableName) => {
           if (!fieldsMockData[tableName]) {
-            console.log('准备获取表字段:', tableName);
             fetchTableSchema(tableName);
           }
         });
@@ -352,149 +427,149 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
 
   // 点击最右侧"提交"时执行
   const handleSubmit = async (values: any) => {
-    // 将高级安全选项状态仅添加到顶级
-    values.securityEnabled = showSecurityOptions;
+    // 检查是否有任何表设置了字段安全配置
+    const hasSecurityConfig = Object.values(tablesSecurityOptions).some((tableOptions) => {
+      return Object.values(tableOptions).some((option) => option.encrypt || option.mask);
+    });
 
-    // 组装 mappings 字段，并将安全选项集成到每个表对象中
-    values.mappings = [
+    // 1. Construct mappings array first, incorporating per-table advanced settings
+    const mappings: MappingBlock[] = [
       {
         tables: (targetKeys || []).map((tableName) => {
-          // 基本表映射对象
           const tableMapping: TableItem = {
             sourceTable: tableName,
             targetTable: tableName,
+            // Integrate advancedSettings from tableAdvancedSettings state
+            advancedSettings: {
+              syncIndexes: tableAdvancedSettings[tableName]?.syncIndexes ?? false,
+              ignoreDeleteOps: tableAdvancedSettings[tableName]?.ignoreDeleteOps ?? false,
+            },
           };
 
-          // 如果启用了安全选项且该表有安全设置
-          if (showSecurityOptions && tablesSecurityOptions[tableName]) {
-            // 将安全选项转换为正确的 fieldSecurity 格式
+          // Add fieldSecurity if enabled and configured
+          if (tablesSecurityOptions[tableName]) {
             const fieldSecurity = Object.keys(tablesSecurityOptions[tableName])
               .map((fieldName) => {
                 const options = tablesSecurityOptions[tableName][fieldName];
-                let securityType = null;
-
-                // 确定安全类型 - 优先选择 encrypt，其次是 mask
-                if (options.encrypt) {
-                  securityType = 'encrypted';
-                } else if (options.mask) {
-                  securityType = 'masked';
-                }
-
-                // 只有当有安全类型设置时才返回
-                if (securityType) {
-                  return {
-                    field: fieldName,
-                    securityType: securityType,
-                  };
-                }
+                let securityType: 'encrypted' | 'masked' | null = null;
+                if (options.encrypt) securityType = 'encrypted';
+                else if (options.mask) securityType = 'masked';
+                if (securityType) return { field: fieldName, securityType };
                 return null;
               })
-              .filter((item) => item !== null); // 过滤掉没有设置安全类型的字段
+              .filter((item): item is FieldSecurityOption => item !== null);
+            if (fieldSecurity.length > 0) tableMapping.fieldSecurity = fieldSecurity;
+          }
 
-            // 只有当有字段安全设置时才添加 fieldSecurity 数组
-            if (fieldSecurity.length > 0) {
-              tableMapping.fieldSecurity = fieldSecurity;
-            }
+          // Add countQuery if there are conditions for this table
+          const tableConditions = conditions.filter((c) => c.table === tableName);
+          if (tableConditions.length > 0) {
+            tableMapping.countQuery = { enabled: true, conditions: tableConditions };
           }
 
           return tableMapping;
         }),
+        // Potentially: sourceDatabase, sourceSchema, targetDatabase, targetSchema
       },
     ];
 
-    // 将 sourceType 存为 payload.type (因为 API 需要 "type" 字段)
     const dbType = values.sourceType;
-    const payload: any = {
-      ...values,
-      type: dbType,
+
+    // 2. Explicitly build the main payload for the API, maintaining type safety
+    const payload: Partial<SyncRecord> = {
+      // Fields from the form (via 'values' object)
+      taskName: values.taskName,
+      sourceType: dbType, // Use sourceType as defined in SyncRecord
+      sourceConn: values.sourceConn,
+      targetConn: values.targetConn,
+
+      // DB-specific parameters from 'values' (ensure these are optional in SyncRecord or handle undefined)
+      pg_replication_slot: values.pg_replication_slot,
+      pg_plugin: values.pg_plugin,
+      pg_position_path: values.pg_position_path,
+      pg_publication_names: values.pg_publication_names,
+      mysql_position_path: values.mysql_position_path,
+      mongodb_resume_token_path: values.mongodb_resume_token_path,
+      redis_position_path: values.redis_position_path,
+
+      // Mappings constructed above (now includes per-table advancedSettings)
+      mappings: mappings,
+
+      // Global security flag calculated from actual field security options
+      securityEnabled: hasSecurityConfig,
+
+      // API-managed fields
       lastUpdateTime: getCurrentTimeString(),
-      dump_execution_path: null, // 通常置为 null, 视需要保留或删除
     };
 
-    // 根据数据库类型保留对应的参数，其它置 null
+    // 3. Set DB-specific params to undefined for other DB types if they are not applicable
+    //    (Ensures only relevant params are sent, assuming optional fields in SyncRecord)
     switch (dbType) {
       case 'postgresql':
-        payload.pg_replication_slot = values.pg_replication_slot;
-        payload.pg_plugin = values.pg_plugin;
-        payload.pg_position_path = values.pg_position_path;
-        payload.pg_publication_names = values.pg_publication_names;
-
-        // 其余 DB 参数置 null
-        payload.mysql_position_path = null;
-        payload.mongodb_resume_token_path = null;
-        payload.redis_position_path = null;
+        payload.mysql_position_path = undefined;
+        payload.mongodb_resume_token_path = undefined;
+        payload.redis_position_path = undefined;
         break;
       case 'mysql':
-        payload.mysql_position_path = values.mysql_position_path;
-
-        payload.pg_replication_slot = null;
-        payload.pg_plugin = null;
-        payload.pg_position_path = null;
-        payload.pg_publication_names = null;
-        payload.mongodb_resume_token_path = null;
-        payload.redis_position_path = null;
-        break;
-      case 'mariadb':
-        payload.mysql_position_path = values.mysql_position_path; // reuse key name
-
-        payload.pg_replication_slot = null;
-        payload.pg_plugin = null;
-        payload.pg_position_path = null;
-        payload.pg_publication_names = null;
-        payload.mongodb_resume_token_path = null;
-        payload.redis_position_path = null;
+      case 'mariadb': // Mariadb uses mysql_position_path
+        payload.pg_replication_slot = undefined;
+        payload.pg_plugin = undefined;
+        payload.pg_position_path = undefined;
+        payload.pg_publication_names = undefined;
+        payload.mongodb_resume_token_path = undefined;
+        payload.redis_position_path = undefined;
         break;
       case 'mongodb':
-        payload.mongodb_resume_token_path = values.mongodb_resume_token_path;
-
-        payload.pg_replication_slot = null;
-        payload.pg_plugin = null;
-        payload.pg_position_path = null;
-        payload.pg_publication_names = null;
-        payload.mysql_position_path = null;
-        payload.redis_position_path = null;
+        payload.pg_replication_slot = undefined;
+        payload.pg_plugin = undefined;
+        payload.pg_position_path = undefined;
+        payload.pg_publication_names = undefined;
+        payload.mysql_position_path = undefined;
+        payload.redis_position_path = undefined;
         break;
       case 'redis':
-        payload.redis_position_path = values.redis_position_path;
-
-        payload.pg_replication_slot = null;
-        payload.pg_plugin = null;
-        payload.pg_position_path = null;
-        payload.pg_publication_names = null;
-        payload.mysql_position_path = null;
-        payload.mongodb_resume_token_path = null;
+        payload.pg_replication_slot = undefined;
+        payload.pg_plugin = undefined;
+        payload.pg_position_path = undefined;
+        payload.pg_publication_names = undefined;
+        payload.mysql_position_path = undefined;
+        payload.mongodb_resume_token_path = undefined;
         break;
-      default:
-        // If no known type, set all to null
-        payload.pg_replication_slot = null;
-        payload.pg_plugin = null;
-        payload.pg_position_path = null;
-        payload.pg_publication_names = null;
-        payload.mysql_position_path = null;
-        payload.mongodb_resume_token_path = null;
-        payload.redis_position_path = null;
+      default: // If dbType is something else, all specific params are undefined
+        payload.pg_replication_slot = undefined;
+        payload.pg_plugin = undefined;
+        payload.pg_position_path = undefined;
+        payload.pg_publication_names = undefined;
+        payload.mysql_position_path = undefined;
+        payload.mongodb_resume_token_path = undefined;
+        payload.redis_position_path = undefined;
         break;
     }
 
     let res;
     if (record && record.id) {
-      // 合并旧数据 - 确保安全选项正确传递
-      const finalBody = {
-        ...record,
-        ...payload,
-        // 显式地添加安全选项，确保不会被覆盖
-        securityOptions: values.securityOptions,
+      // For update, merge with existing record fields.
+      // Payload will override fields from record if they exist in payload.
+      const finalBody: SyncRecord = {
+        ...(record as SyncRecord), // Start with all fields from the existing record
+        ...(payload as SyncRecord), // Override/add fields from the newly constructed payload
+        id: record.id, // Ensure ID is present for update
+        enable: record.enable, // Preserve existing 'enable' status explicitly if not in form
+        status: record.status, // Preserve existing 'status' explicitly if not in form
       };
 
-      res = await updateSync({
-        id: record.id.toString(),
-        body: finalBody,
-      });
+      // The top-level syncIndexes and monitorDelete are no longer in SyncRecord type.
+      // If 'record' prop could have them from an old data structure, deleting them defensively is an option:
+      // delete (finalBody as any).syncIndexes;
+      // delete (finalBody as any).monitorDelete;
+      // However, if SyncRecord type is the source of truth and updated, this shouldn't be necessary.
+
+      res = await updateSync({ id: record.id.toString(), body: finalBody });
     } else {
-      // 新增任务时，同样确保安全选项正确传递
-      payload.status = 'Running';
-      payload.securityOptions = values.securityOptions; // 显式地添加安全选项
-      res = await addSyncTask(payload);
+      // For new tasks, set status and use the constructed payload
+      (payload as SyncRecord).status = 'Running'; // Default status for new tasks
+      (payload as SyncRecord).enable = true; // Default enable for new tasks
+      res = await addSyncTask(payload as SyncRecord);
     }
 
     if (res.success) {
@@ -733,89 +808,52 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
     setSelectedKeys([...sourceSelectedKeys, ...targetSelectedKeys] as string[]);
   };
 
-  // 修改 TableSchemaComponent 组件，改变表名获取方式
-  const TableSchemaComponent = ({ table, advancedSecurityEnabled }: TableSchemaComponentProps) => {
-    // 直接使用传入的完整表名，而不是尝试从字段key提取
-    const tableName =
-      table.length > 0 && table[0]._tableName
-        ? table[0]._tableName // 使用我们添加的特殊属性
-        : table.length > 0
-          ? String(table[0].key).split('_')[0]
-          : ''; // 兼容旧逻辑
-
-    // 使用父组件中已存储的选项或创建新的
+  // 表结构组件
+  const TableSchemaComponent = ({
+    table,
+    advancedSecurityEnabled,
+    tableName,
+  }: TableSchemaComponentProps) => {
     const [securityOptions, setSecurityOptions] = useState<Record<string, FieldOption>>(
       tablesSecurityOptions[tableName] || {},
     );
 
-    // 当安全选项变更时更新父组件状态 - 使用 useEffect 的清理函数减少重复渲染
-    useEffect(() => {
-      // 避免空表名或空选项的情况
-      if (!tableName || Object.keys(securityOptions).length === 0) return;
+    const handleSecurityOptionChange = useCallback(
+      (fieldName: string, optionType: 'encrypt' | 'mask') => {
+        const currentOptions = securityOptions[fieldName] || { encrypt: false, mask: false };
 
-      // 比较当前选项和已存储选项是否相同，避免无意义的更新
-      const currentOptions = tablesSecurityOptions[tableName];
-      const needsUpdate =
-        !currentOptions || JSON.stringify(currentOptions) !== JSON.stringify(securityOptions);
-
-      if (needsUpdate) {
-        // 使用函数式更新避免依赖于先前的状态
-        setTablesSecurityOptions((prev) => ({
-          ...prev,
-          [tableName]: securityOptions,
-        }));
-      }
-
-      // 返回清理函数
-      return () => {
-        // 清理时不需要做任何事情，但这有助于 React 优化更新
-      };
-    }, [tableName]); // 仅在表名变化时执行，securityOptions通过事件处理程序单独更新
-
-    // 处理安全选项变更 - 在这里直接更新父组件状态
-    const handleSecurityOptionChange = (fieldName: string, optionType: 'encrypt' | 'mask') => {
-      setSecurityOptions((prev) => {
-        const fieldOptions = prev[fieldName] || { encrypt: false, mask: false };
-
-        // 如果已经选择了当前选项，则取消选择
-        if (fieldOptions[optionType]) {
-          const newOptions = {
-            ...prev,
-            [fieldName]: {
-              ...fieldOptions,
-              [optionType]: false,
-            },
+        let newFieldOptions: FieldOption;
+        if (currentOptions[optionType]) {
+          newFieldOptions = {
+            ...currentOptions,
+            [optionType]: false,
           };
-
-          // 直接更新父组件状态
-          setTablesSecurityOptions((prevTables) => ({
-            ...prevTables,
-            [tableName]: newOptions,
-          }));
-
-          return newOptions;
-        }
-
-        // 否则选择当前选项，并确保另一个选项被取消
-        const newOptions = {
-          ...prev,
-          [fieldName]: {
+        } else {
+          newFieldOptions = {
             encrypt: optionType === 'encrypt',
             mask: optionType === 'mask',
-          },
+          };
+        }
+
+        const newSecurityOptions = {
+          ...securityOptions,
+          [fieldName]: newFieldOptions,
         };
 
-        // 直接更新父组件状态
+        setSecurityOptions(newSecurityOptions);
         setTablesSecurityOptions((prevTables) => ({
           ...prevTables,
-          [tableName]: newOptions,
+          [tableName]: newSecurityOptions,
         }));
+      },
+      [securityOptions, tableName],
+    );
 
-        return newOptions;
-      });
-    };
+    useEffect(() => {
+      const parentOptions = tablesSecurityOptions[tableName] || {};
+      setSecurityOptions(parentOptions);
+    }, [tableName]);
 
-    // 重新组织字段数据，将嵌套字段分组
     const organizeFields = (fields: any[]) => {
       const result: any[] = [];
       const nestedFields: Record<string, any[]> = {};
@@ -825,7 +863,6 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
         if (fieldName.includes('.')) {
           const [parent, child] = fieldName.split('.');
           if (!nestedFields[parent]) {
-            // 首次遇到父字段时，添加父字段
             nestedFields[parent] = [];
             result.push({
               key: parent,
@@ -835,15 +872,13 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
               children: nestedFields[parent],
             });
           }
-          // 将子字段添加到对应的父字段的children数组中
           nestedFields[parent].push({
             key: `${parent}.${child}`,
             fieldName: child,
             fieldType: field.fieldType || field.type,
-            fullFieldName: fieldName, // 保存完整字段名用于安全选项
+            fullFieldName: fieldName,
           });
         } else {
-          // 非嵌套字段直接添加
           result.push({
             key: fieldName,
             fieldName: fieldName,
@@ -854,6 +889,47 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
 
       return result;
     };
+
+    const securityColumn = advancedSecurityEnabled
+      ? {
+          title: intl.formatMessage({ id: 'pages.sync.securityOptions' }),
+          key: 'securityOptions',
+          render: (_: any, record: any) => {
+            const fieldName = record.fullFieldName || record.fieldName;
+            if (record.isParent) {
+              return null;
+            }
+
+            const fieldOptions = securityOptions[fieldName] || {
+              encrypt: false,
+              mask: false,
+            };
+
+            return (
+              <Space size="middle">
+                <Button
+                  type={fieldOptions.encrypt ? 'primary' : 'default'}
+                  icon={<LockOutlined />}
+                  size="small"
+                  onClick={() => handleSecurityOptionChange(fieldName, 'encrypt')}
+                  style={{ display: 'flex', alignItems: 'center' }}
+                >
+                  {intl.formatMessage({ id: 'pages.sync.encrypt' })}
+                </Button>
+                <Button
+                  type={fieldOptions.mask ? 'primary' : 'default'}
+                  icon={<EyeInvisibleOutlined />}
+                  size="small"
+                  onClick={() => handleSecurityOptionChange(fieldName, 'mask')}
+                  style={{ display: 'flex', alignItems: 'center' }}
+                >
+                  {intl.formatMessage({ id: 'pages.sync.mask' })}
+                </Button>
+              </Space>
+            );
+          },
+        }
+      : {};
 
     // 修改列定义
     const columns = [
@@ -875,50 +951,7 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
         dataIndex: 'fieldType',
         key: 'fieldType',
       },
-      ...(advancedSecurityEnabled
-        ? [
-            {
-              title: intl.formatMessage({ id: 'pages.sync.securityOptions' }),
-              key: 'securityOptions',
-              render: (_: any, record: any) => {
-                // 使用完整字段名（对于嵌套字段）或普通字段名
-                const fieldName = record.fullFieldName || record.fieldName;
-                // 父字段不显示安全选项
-                if (record.isParent) {
-                  return null;
-                }
-
-                const fieldOptions = securityOptions[fieldName] || {
-                  encrypt: false,
-                  mask: false,
-                };
-
-                return (
-                  <Space size="middle">
-                    <Button
-                      type={fieldOptions.encrypt ? 'primary' : 'default'}
-                      icon={<LockOutlined />}
-                      size="small"
-                      onClick={() => handleSecurityOptionChange(fieldName, 'encrypt')}
-                      style={{ display: 'flex', alignItems: 'center' }}
-                    >
-                      {intl.formatMessage({ id: 'pages.sync.encrypt' })}
-                    </Button>
-                    <Button
-                      type={fieldOptions.mask ? 'primary' : 'default'}
-                      icon={<EyeInvisibleOutlined />}
-                      size="small"
-                      onClick={() => handleSecurityOptionChange(fieldName, 'mask')}
-                      style={{ display: 'flex', alignItems: 'center' }}
-                    >
-                      {intl.formatMessage({ id: 'pages.sync.mask' })}
-                    </Button>
-                  </Space>
-                );
-              },
-            },
-          ]
-        : []),
+      ...(advancedSecurityEnabled ? [securityColumn] : []),
     ];
 
     // 处理表格数据源
@@ -934,7 +967,7 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
 
     return (
       <Table
-        columns={columns}
+        columns={columns.filter(Boolean)}
         dataSource={dataSource}
         pagination={false}
         indentSize={24}
@@ -948,40 +981,138 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
     );
   };
 
-  // 修改安全选项初始化逻辑，确保securityEnabled正确加载
+  // 初始化安全选项和高级设置
   useEffect(() => {
     if (record) {
-      // 使用控制台确认加载的record值
-      console.log('Loading record:', record);
+      if (record.mappings && record.mappings.length > 0 && record.mappings[0].tables) {
+        const newTablesSecurityOptions: Record<string, Record<string, FieldOption>> = {};
+        const newTableAdvancedSettings: Record<
+          string,
+          { syncIndexes: boolean; ignoreDeleteOps: boolean }
+        > = {};
 
-      // 初始化状态为false
-      let securityEnabled = false;
+        record.mappings[0].tables.forEach((table) => {
+          // 加载每个表的高级设置
+          newTableAdvancedSettings[table.sourceTable] = {
+            syncIndexes: table.advancedSettings?.syncIndexes ?? false,
+            ignoreDeleteOps: table.advancedSettings?.ignoreDeleteOps ?? false,
+          };
 
-      // 从顶级属性中检查securityEnabled
-      if (record.securityEnabled !== undefined) {
-        securityEnabled = !!record.securityEnabled;
-        console.log('Using top-level securityEnabled:', securityEnabled);
+          if (table.fieldSecurity && table.fieldSecurity.length > 0) {
+            if (!newTablesSecurityOptions[table.sourceTable]) {
+              newTablesSecurityOptions[table.sourceTable] = {};
+            }
+
+            table.fieldSecurity.forEach((security) => {
+              newTablesSecurityOptions[table.sourceTable][security.field] = {
+                encrypt: security.securityType === 'encrypted',
+                mask: security.securityType === 'masked',
+              };
+            });
+          }
+        });
+
+        if (Object.keys(newTablesSecurityOptions).length > 0) {
+          setTablesSecurityOptions(newTablesSecurityOptions);
+        }
+
+        if (Object.keys(newTableAdvancedSettings).length > 0) {
+          setTableAdvancedSettings(newTableAdvancedSettings);
+        }
       }
-      // 如果顶级没有，则尝试从mapping中读取(兼容旧数据)
-      else if (
-        record.mappings &&
-        record.mappings.length > 0 &&
-        record.mappings[0]?.securityEnabled !== undefined // 添加可选链
-      ) {
-        securityEnabled = !!record.mappings[0].securityEnabled;
-        console.log('Using mapping securityEnabled:', securityEnabled);
-      }
-
-      // 设置状态值
-      setShowSecurityOptions(securityEnabled);
     }
   }, [record]);
+
+  // 添加查询条件
+  const addCondition = () => {
+    if (!currentQueryTable) {
+      message.warning(intl.formatMessage({ id: 'pages.sync.pleaseSelectTableFirst' }));
+      return;
+    }
+
+    if (!currentQueryField) {
+      message.warning(intl.formatMessage({ id: 'pages.sync.fieldRequired' }));
+      return;
+    }
+
+    setConditions([
+      ...conditions,
+      {
+        table: currentQueryTable,
+        field: currentQueryField,
+        operator: currentQueryOperator,
+        value: currentQueryValue,
+      },
+    ]);
+
+    // 清空表单数据，准备添加下一个条件
+    setCurrentQueryField('');
+    setCurrentQueryValue('');
+  };
+
+  // 删除查询条件
+  const removeCondition = (index: number) => {
+    const newConditions = [...conditions];
+    newConditions.splice(index, 1);
+    setConditions(newConditions);
+  };
+
+  // 当表选择变化时，更新当前查询表（仅在没有设置时）
+  useEffect(() => {
+    if (targetKeys.length > 0 && !currentQueryTable) {
+      const firstTable = targetKeys[0];
+      setCurrentQueryTable(firstTable);
+    }
+  }, [targetKeys, currentQueryTable]);
+
+  // 修复Tab键导航问题
+  React.useEffect(() => {
+    const handleTabNavigation = (e: KeyboardEvent) => {
+      if (e.key === 'Tab') {
+        const target = e.target as HTMLInputElement;
+
+        if (target.tagName === 'INPUT' && target.value && target.closest('.ant-modal')) {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+
+          const modal = target.closest('.ant-modal')!;
+          const visibleInputs = Array.from(
+            modal.querySelectorAll('input:not([disabled]):not([type="hidden"])'),
+          ).filter((input) => {
+            const style = window.getComputedStyle(input);
+            return style.display !== 'none' && style.visibility !== 'hidden';
+          }) as HTMLInputElement[];
+
+          const currentIndex = visibleInputs.indexOf(target);
+          const targetIndex = e.shiftKey ? currentIndex - 1 : currentIndex + 1;
+          const targetInput = visibleInputs[targetIndex];
+
+          if (targetInput) {
+            setTimeout(() => {
+              targetInput.focus();
+              targetInput.select();
+            }, 0);
+          }
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleTabNavigation, { capture: true, passive: false });
+
+    return () => {
+      document.removeEventListener('keydown', handleTabNavigation, { capture: true });
+    };
+  }, []);
 
   return (
     <StepsForm
       formRef={formRef}
       onFinish={handleSubmit}
-      formProps={{ preserve: true }}
+      formProps={{
+        preserve: true,
+        validateTrigger: [], // 完全禁用自动验证
+        autoComplete: 'off', // 禁用浏览器自动完成
+      }}
       current={currentStep}
       onCurrentChange={setCurrentStep}
       stepsFormRender={(dom, submitter) => (
@@ -1006,7 +1137,7 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
       {/* 步骤1：数据源类型和任务名称 + DB-specific params */}
       <StepsForm.StepForm
         name="dataSourceTypeStep"
-        title={intl.formatMessage({ id: 'pages.sync.sourceType' })}
+        title={intl.formatMessage({ id: 'pages.sync.sourceTypeStep' })}
         initialValues={{
           sourceType: record?.sourceType || 'mysql',
           taskName: record?.taskName || '',
@@ -1035,6 +1166,7 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
           name="taskName"
           label={intl.formatMessage({ id: 'pages.sync.taskName' })}
           placeholder={intl.formatMessage({ id: 'pages.sync.pleaseEnterTaskName' })}
+          fieldProps={{ autoComplete: 'off' }}
           rules={[
             {
               required: true,
@@ -1066,22 +1198,60 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
               case 'postgresql':
                 return (
                   <>
-                    <ProFormText name="pg_replication_slot" label="PostgreSQL Replication Slot" />
-                    <ProFormText name="pg_plugin" label="PostgreSQL Plugin" />
-                    <ProFormText name="pg_position_path" label="PostgreSQL Position Path" />
-                    <ProFormText name="pg_publication_names" label="PostgreSQL Publication Names" />
+                    <ProFormText
+                      name="pg_replication_slot"
+                      label="PostgreSQL Replication Slot"
+                      fieldProps={{ autoComplete: 'off' }}
+                    />
+                    <ProFormText
+                      name="pg_plugin"
+                      label="PostgreSQL Plugin"
+                      fieldProps={{ autoComplete: 'off' }}
+                    />
+                    <ProFormText
+                      name="pg_position_path"
+                      label="PostgreSQL Position Path"
+                      fieldProps={{ autoComplete: 'off' }}
+                    />
+                    <ProFormText
+                      name="pg_publication_names"
+                      label="PostgreSQL Publication Names"
+                      fieldProps={{ autoComplete: 'off' }}
+                    />
                   </>
                 );
               case 'mysql':
-                return <ProFormText name="mysql_position_path" label="MySQL Position Path" />;
+                return (
+                  <ProFormText
+                    name="mysql_position_path"
+                    label="MySQL Position Path"
+                    fieldProps={{ autoComplete: 'off' }}
+                  />
+                );
               case 'mariadb':
-                return <ProFormText name="mysql_position_path" label="MariaDB Position Path" />;
+                return (
+                  <ProFormText
+                    name="mysql_position_path"
+                    label="MariaDB Position Path"
+                    fieldProps={{ autoComplete: 'off' }}
+                  />
+                );
               case 'mongodb':
                 return (
-                  <ProFormText name="mongodb_resume_token_path" label="MongoDB Resume Token Path" />
+                  <ProFormText
+                    name="mongodb_resume_token_path"
+                    label="MongoDB Resume Token Path"
+                    fieldProps={{ autoComplete: 'off' }}
+                  />
                 );
               case 'redis':
-                return <ProFormText name="redis_position_path" label="Redis Position Path" />;
+                return (
+                  <ProFormText
+                    name="redis_position_path"
+                    label="Redis Position Path"
+                    fieldProps={{ autoComplete: 'off' }}
+                  />
+                );
               default:
                 return null;
             }
@@ -1092,7 +1262,7 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
       {/* 步骤2：Source DB 连接信息 */}
       <StepsForm.StepForm
         name="sourceConnStep"
-        title={intl.formatMessage({ id: 'pages.sync.sourceDBConn' })}
+        title={intl.formatMessage({ id: 'pages.sync.sourceDBConnStep' })}
         initialValues={{ sourceConn: record?.sourceConn || {} }}
         onFinish={handleSourceConnNext}
       >
@@ -1100,6 +1270,7 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
           name={['sourceConn', 'host']}
           label={intl.formatMessage({ id: 'pages.sync.host' })}
           placeholder={intl.formatMessage({ id: 'pages.sync.pleaseEnterSourceHost' })}
+          fieldProps={{ autoComplete: 'off' }}
           rules={[
             {
               required: true,
@@ -1111,6 +1282,7 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
           name={['sourceConn', 'port']}
           label={intl.formatMessage({ id: 'pages.sync.port' })}
           placeholder={intl.formatMessage({ id: 'pages.sync.pleaseEnterSourcePort' })}
+          fieldProps={{ autoComplete: 'off' }}
           rules={[
             {
               required: true,
@@ -1122,17 +1294,19 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
           name={['sourceConn', 'user']}
           label={intl.formatMessage({ id: 'pages.sync.username' })}
           placeholder={intl.formatMessage({ id: 'pages.sync.pleaseEnterSourceUsername' })}
+          fieldProps={{ autoComplete: 'off' }}
         />
         <ProFormText
           name={['sourceConn', 'password']}
           label={intl.formatMessage({ id: 'pages.sync.password' })}
           placeholder={intl.formatMessage({ id: 'pages.sync.pleaseEnterSourcePassword' })}
-          fieldProps={{ type: 'password' }}
+          fieldProps={{ type: 'password', autoComplete: 'new-password' }}
         />
         <ProFormText
           name={['sourceConn', 'database']}
           label={intl.formatMessage({ id: 'pages.sync.databaseName' })}
           placeholder={intl.formatMessage({ id: 'pages.sync.pleaseEnterSourceDB' })}
+          fieldProps={{ autoComplete: 'off' }}
           rules={[
             {
               required: true,
@@ -1148,7 +1322,7 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
       {/* 步骤3：Target DB 连接信息 */}
       <StepsForm.StepForm
         name="targetConnStep"
-        title={intl.formatMessage({ id: 'pages.sync.targetDBConn' })}
+        title={intl.formatMessage({ id: 'pages.sync.targetDBConnStep' })}
         initialValues={{ targetConn: record?.targetConn || {} }}
         onFinish={handleTargetConnNext}
       >
@@ -1156,6 +1330,7 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
           name={['targetConn', 'host']}
           label={intl.formatMessage({ id: 'pages.sync.host' })}
           placeholder={intl.formatMessage({ id: 'pages.sync.pleaseEnterTargetHost' })}
+          fieldProps={{ autoComplete: 'off' }}
           rules={[
             {
               required: true,
@@ -1167,6 +1342,7 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
           name={['targetConn', 'port']}
           label={intl.formatMessage({ id: 'pages.sync.port' })}
           placeholder={intl.formatMessage({ id: 'pages.sync.pleaseEnterTargetPort' })}
+          fieldProps={{ autoComplete: 'off' }}
           rules={[
             {
               required: true,
@@ -1178,17 +1354,19 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
           name={['targetConn', 'user']}
           label={intl.formatMessage({ id: 'pages.sync.username' })}
           placeholder={intl.formatMessage({ id: 'pages.sync.pleaseEnterTargetUsername' })}
+          fieldProps={{ autoComplete: 'off' }}
         />
         <ProFormText
           name={['targetConn', 'password']}
           label={intl.formatMessage({ id: 'pages.sync.password' })}
           placeholder={intl.formatMessage({ id: 'pages.sync.pleaseEnterTargetPassword' })}
-          fieldProps={{ type: 'password' }}
+          fieldProps={{ type: 'password', autoComplete: 'new-password' }}
         />
         <ProFormText
           name={['targetConn', 'database']}
           label={intl.formatMessage({ id: 'pages.sync.databaseName' })}
           placeholder={intl.formatMessage({ id: 'pages.sync.pleaseEnterTargetDB' })}
+          fieldProps={{ autoComplete: 'off' }}
           rules={[
             {
               required: true,
@@ -1204,85 +1382,730 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
       {/* 步骤4：表/集合映射 */}
       <StepsForm.StepForm
         name="mappingStep"
-        title={intl.formatMessage({ id: 'pages.sync.tableMapping' })}
+        title={intl.formatMessage({ id: 'pages.sync.tableMappingStep' })}
       >
-        <Transfer
-          dataSource={tableData}
-          titles={[
-            intl.formatMessage({ id: 'pages.sync.availableTables' }),
-            intl.formatMessage({ id: 'pages.sync.selectedTables' }),
-          ]}
-          targetKeys={targetKeys as Key[]}
-          selectedKeys={selectedKeys as Key[]}
-          onChange={onTransferChange}
-          onSelectChange={onSelectChange}
-          render={(item) => item.title}
-          listStyle={{ width: 300, height: 400 }}
-          showSearch
-          filterOption={(inputValue, option) =>
-            option.title.toLowerCase().indexOf(inputValue.toLowerCase()) !== -1
-          }
-          searchPlaceholder={intl.formatMessage({ id: 'pages.sync.searchTables' })}
-        />
+        <div style={{ display: 'flex', flexDirection: 'column', position: 'relative' }}>
+          <div style={{ marginBottom: 16 }}>
+            <Row gutter={[0, 16]}>
+              <Col span={24}>
+                <Transfer
+                  dataSource={tableData}
+                  titles={[
+                    intl.formatMessage({ id: 'pages.sync.availableTables' }),
+                    intl.formatMessage({ id: 'pages.sync.selectedTables' }),
+                  ]}
+                  targetKeys={targetKeys as Key[]}
+                  selectedKeys={selectedKeys as Key[]}
+                  onChange={onTransferChange}
+                  onSelectChange={onSelectChange}
+                  render={(item) => item.title}
+                  listStyle={{ width: 300, height: 300 }}
+                  showSearch
+                  filterOption={(inputValue, option) =>
+                    option.title.toLowerCase().indexOf(inputValue.toLowerCase()) !== -1
+                  }
+                />
+              </Col>
+            </Row>
+          </div>
 
-        {/* 添加高级安全选项开关 */}
-        <div style={{ marginTop: 24, borderTop: '1px dashed #ccc', paddingTop: 16 }}>
-          <Switch
-            checked={showSecurityOptions}
-            onChange={(checked) => {
-              console.log('Security option switch changed to:', checked);
-              setShowSecurityOptions(checked);
-              // 如果关闭安全选项，可以选择清空所有安全设置
-              if (!checked) {
-                // 可选：清空所有安全选项
-                // setTablesSecurityOptions({});
-              }
-            }}
-            style={{ marginRight: 8 }}
-          />
-          <Typography.Text strong>
-            {intl.formatMessage({ id: 'pages.sync.advancedSecurity' })}
-          </Typography.Text>
-          {record &&
-            (record.securityEnabled ||
-              (record.mappings &&
-                record.mappings.length > 0 &&
-                record.mappings[0].securityEnabled)) && (
-              <Typography.Text type="success" style={{ marginLeft: 8 }}>
-                ({intl.formatMessage({ id: 'pages.sync.securityEnabled' })})
-              </Typography.Text>
-            )}
-        </div>
+          {/* 全局设置区域 - 删除整个区域 */}
 
-        {/* 显示表字段及操作 */}
-        {showSecurityOptions && (
-          <div style={{ marginTop: 16 }}>
-            <Collapse>
-              {(targetKeys || []).map((tableName) => {
-                console.log(`表 ${tableName} 的字段数据:`, fieldsMockData[tableName]);
-                return (
-                  <Collapse.Panel
-                    header={`${intl.formatMessage({ id: 'pages.syncSettings.table' })}${tableName}`}
-                    key={tableName}
+          {targetKeys.length > 0 && (
+            <div
+              style={{
+                marginTop: 16,
+                border: '1px solid #f0f0f0',
+                borderRadius: '4px',
+                padding: '16px',
+                height: '400px',
+                overflow: 'hidden',
+                position: 'relative',
+                width: '100%',
+              }}
+              className="sync-config-container"
+            >
+              {/* 表选择器 */}
+              <Row gutter={[0, 16]}>
+                <Col span={24}>
+                  <Space align="center">
+                    <Typography.Text strong>
+                      {intl.formatMessage({ id: 'pages.sync.selectTableLabel' })}
+                    </Typography.Text>
+                    <Select
+                      style={{ width: 300 }}
+                      placeholder={intl.formatMessage({ id: 'pages.sync.selectTableToConfig' })}
+                      value={currentQueryTable}
+                      onChange={(value) => {
+                        setCurrentQueryTable(value);
+
+                        // 优先显示概览Tab
+                        setActiveTabKey('overview');
+                      }}
+                    >
+                      {targetKeys.map((table) => (
+                        <Select.Option key={table} value={table}>
+                          {table}
+                        </Select.Option>
+                      ))}
+                    </Select>
+                  </Space>
+                </Col>
+              </Row>
+
+              {/* 中心化功能选项卡 */}
+              <Tabs
+                defaultActiveKey="overview"
+                style={{ marginTop: 16, width: '100%' }}
+                destroyInactiveTabPane={false}
+                animated={false}
+                tabBarStyle={{
+                  marginBottom: 0,
+                  background: '#fafafa',
+                  borderRadius: '6px 6px 0 0',
+                  padding: '4px',
+                  border: '1px solid #d9d9d9',
+                  borderBottom: 'none',
+                }}
+                className="sync-tab-container"
+                activeKey={activeTabKey}
+                type="card"
+                size="small"
+                onChange={(activeKey) => {
+                  setActiveTabKey(activeKey);
+                  // 在下一个事件循环中确保选项卡内容区域高度稳定
+                  setTimeout(() => {
+                    const contentWrappers = document.querySelectorAll('.tab-content-wrapper');
+                    contentWrappers.forEach((wrapper) => {
+                      if (wrapper) {
+                        (wrapper as HTMLElement).style.height = '300px';
+                      }
+                    });
+                  }, 0);
+                }}
+                tabBarGutter={2}
+              >
+                {/* 表概览选项卡 */}
+                <Tabs.TabPane
+                  tab={
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        padding: '2px 6px',
+                        fontWeight: 500,
+                        fontSize: '12px',
+                      }}
+                    >
+                      <TableOutlined style={{ fontSize: '12px' }} />
+                      <span>{intl.formatMessage({ id: 'pages.sync.tableOverviewTab' })}</span>
+                    </div>
+                  }
+                  key="overview"
+                  forceRender
+                >
+                  <div
+                    className="tab-content-wrapper"
+                    style={{
+                      height: '300px',
+                      overflowY: 'scroll',
+                      background: '#fff',
+                      border: '1px solid #d9d9d9',
+                      borderTop: 'none',
+                      padding: '16px',
+                    }}
                   >
-                    {isLoadingFields && !fieldsMockData[tableName] ? (
+                    <div style={{ marginBottom: '12px' }}>
+                      <Typography.Text type="secondary" style={{ fontSize: '14px' }}>
+                        {intl.formatMessage(
+                          { id: 'pages.sync.tableOverviewDesc' },
+                          {
+                            defaultMessage:
+                              '查看所有已选择表的配置状态概览，点击表行可以选择要配置的表',
+                          },
+                        )}
+                      </Typography.Text>
+                    </div>
+                    <Table
+                      dataSource={targetKeys.map((tableName) => ({
+                        key: tableName,
+                        tableName,
+                        securityCount: tablesSecurityOptions[tableName]
+                          ? Object.values(tablesSecurityOptions[tableName]).filter(
+                              (opt) => opt.encrypt || opt.mask,
+                            ).length
+                          : 0,
+                        queryCount: conditions.filter((c) => c.table === tableName).length,
+                      }))}
+                      columns={[
+                        {
+                          title: intl.formatMessage({ id: 'pages.sync.tableName' }),
+                          dataIndex: 'tableName',
+                          key: 'tableName',
+                        },
+                        {
+                          title: intl.formatMessage({ id: 'pages.sync.securityFields' }),
+                          dataIndex: 'securityCount',
+                          key: 'securityCount',
+                          render: (count) => (
+                            <Space>
+                              <Badge
+                                count={count}
+                                style={{ backgroundColor: count > 0 ? '#52c41a' : '#d9d9d9' }}
+                              />
+                              {count > 0 ? (
+                                <Typography.Text type="success">
+                                  {intl.formatMessage({ id: 'pages.sync.configured' })}
+                                </Typography.Text>
+                              ) : (
+                                <Typography.Text type="secondary">
+                                  {intl.formatMessage({ id: 'pages.sync.notConfigured' })}
+                                </Typography.Text>
+                              )}
+                            </Space>
+                          ),
+                        },
+                        {
+                          title: intl.formatMessage({ id: 'pages.sync.queryConditions' }),
+                          dataIndex: 'queryCount',
+                          key: 'queryCount',
+                          render: (count) => (
+                            <Space>
+                              <Badge
+                                count={count}
+                                style={{ backgroundColor: count > 0 ? '#1890ff' : '#d9d9d9' }}
+                              />
+                              {count > 0 ? (
+                                <Typography.Text type="success">
+                                  {intl.formatMessage({ id: 'pages.sync.configured' })}
+                                </Typography.Text>
+                              ) : (
+                                <Typography.Text type="secondary">
+                                  {intl.formatMessage({ id: 'pages.sync.notConfigured' })}
+                                </Typography.Text>
+                              )}
+                            </Space>
+                          ),
+                        },
+                      ]}
+                      pagination={false}
+                      size="small"
+                      rowClassName={(record) =>
+                        record.tableName === currentQueryTable ? 'ant-table-row-selected' : ''
+                      }
+                      onRow={(record) => ({
+                        onClick: () => {
+                          setCurrentQueryTable(record.tableName);
+                        },
+                        onDoubleClick: () => {
+                          // 双击行时，如果行有安全配置则切换到Schema页，否则切换到Query页
+                          setCurrentQueryTable(record.tableName);
+                          const securityCount = tablesSecurityOptions[record.tableName]
+                            ? Object.values(tablesSecurityOptions[record.tableName]).filter(
+                                (opt) => opt.encrypt || opt.mask,
+                              ).length
+                            : 0;
+
+                          // 优先展示有配置的Tab，否则默认切换到Schema
+                          if (securityCount > 0) {
+                            setActiveTabKey('schema');
+                          } else {
+                            const queryCount = conditions.filter(
+                              (c) => c.table === record.tableName,
+                            ).length;
+                            if (queryCount > 0) {
+                              setActiveTabKey('query');
+                            } else {
+                              setActiveTabKey('schema');
+                            }
+                          }
+                        },
+                        style: { cursor: 'pointer' },
+                        title: intl.formatMessage(
+                          { id: 'pages.sync.clickToSelectDoubleClickToEdit' },
+                          { defaultMessage: '点击选中表，双击进入配置页' },
+                        ),
+                      })}
+                    />
+                  </div>
+                </Tabs.TabPane>
+
+                {/* 表结构选项卡 */}
+                <Tabs.TabPane
+                  tab={
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        padding: '2px 6px',
+                        fontWeight: 500,
+                        fontSize: '12px',
+                      }}
+                    >
+                      <SecurityScanOutlined style={{ fontSize: '12px' }} />
+                      <span>{intl.formatMessage({ id: 'pages.sync.tableSchemaTab' })}</span>
+                    </div>
+                  }
+                  key="schema"
+                  disabled={!currentQueryTable}
+                  forceRender
+                >
+                  <div
+                    className="tab-content-wrapper"
+                    style={{
+                      height: '300px',
+                      overflowY: 'scroll',
+                      background: '#fff',
+                      border: '1px solid #d9d9d9',
+                      borderTop: 'none',
+                      padding: '16px',
+                    }}
+                  >
+                    {currentQueryTable ? (
+                      <>
+                        <div style={{ marginBottom: '12px' }}>
+                          <Typography.Text type="secondary" style={{ fontSize: '14px' }}>
+                            {intl.formatMessage(
+                              { id: 'pages.sync.tableSchemaDesc' },
+                              { defaultMessage: '为表字段配置安全选项，选择需要加密或脱敏的字段' },
+                            )}
+                          </Typography.Text>
+                        </div>
+                        {isLoadingFields && !fieldsMockData[currentQueryTable] ? (
+                          <div style={{ textAlign: 'center', padding: '20px' }}>
+                            <Spin
+                              tip={intl.formatMessage({ id: 'pages.syncSettings.loadingFields' })}
+                            />
+                          </div>
+                        ) : (
+                          <TableSchemaComponent
+                            table={fieldsMockData[currentQueryTable] || []}
+                            advancedSecurityEnabled={true}
+                            tableName={currentQueryTable}
+                          />
+                        )}
+                      </>
+                    ) : (
                       <div style={{ textAlign: 'center', padding: '20px' }}>
-                        <Spin
-                          tip={intl.formatMessage({ id: 'pages.syncSettings.loadingFields' })}
+                        <Empty
+                          description={intl.formatMessage({ id: 'pages.sync.selectTableFirst' })}
+                          image={Empty.PRESENTED_IMAGE_SIMPLE}
                         />
                       </div>
+                    )}
+                  </div>
+                </Tabs.TabPane>
+
+                {/* 查询条件选项卡 */}
+                <Tabs.TabPane
+                  tab={
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        padding: '2px 6px',
+                        fontWeight: 500,
+                        fontSize: '12px',
+                      }}
+                    >
+                      <FilterOutlined style={{ fontSize: '12px' }} />
+                      <span>{intl.formatMessage({ id: 'pages.sync.queryConditionsTab' })}</span>
+                    </div>
+                  }
+                  key="query"
+                  disabled={!currentQueryTable}
+                  forceRender
+                >
+                  <div
+                    className="tab-content-wrapper"
+                    style={{
+                      height: '300px',
+                      overflowY: 'scroll',
+                      background: '#fff',
+                      border: '1px solid #d9d9d9',
+                      borderTop: 'none',
+                      padding: '16px',
+                    }}
+                  >
+                    {currentQueryTable ? (
+                      <>
+                        <div style={{ marginBottom: '12px' }}>
+                          <Typography.Text type="secondary" style={{ fontSize: '14px' }}>
+                            {intl.formatMessage(
+                              { id: 'pages.sync.queryConditionsDesc' },
+                              {
+                                defaultMessage:
+                                  '为表配置自定义查询条件，支持多种操作符和日期范围查询',
+                              },
+                            )}
+                          </Typography.Text>
+                        </div>
+                        <div style={{ marginBottom: 16 }}>
+                          <Typography.Title
+                            level={5}
+                            style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '12px' }}
+                          >
+                            {intl.formatMessage({ id: 'pages.sync.addQueryField' })}
+                          </Typography.Title>
+
+                          <Row gutter={8} align="middle">
+                            <Col span={8}>
+                              <Input
+                                placeholder={intl.formatMessage({ id: 'pages.sync.fieldName' })}
+                                value={currentQueryField}
+                                onChange={(e) => setCurrentQueryField(e.target.value)}
+                                autoComplete="off"
+                              />
+                            </Col>
+                            <Col span={6}>
+                              <Select
+                                value={currentQueryOperator}
+                                onChange={(value) => {
+                                  setCurrentQueryOperator(value);
+                                  if (value === 'dateRange') {
+                                    setCurrentQueryValue('daily');
+                                  } else {
+                                    setCurrentQueryValue('');
+                                  }
+                                }}
+                                style={{ width: '100%' }}
+                              >
+                                <Select.Option value="=">=</Select.Option>
+                                <Select.Option value="!=">!=</Select.Option>
+                                <Select.Option value=">">{'>'}</Select.Option>
+                                <Select.Option value=">=">{'>='}</Select.Option>
+                                <Select.Option value="<">{'<'}</Select.Option>
+                                <Select.Option value="<=">{'<='}</Select.Option>
+                                <Select.Option value="dateRange">
+                                  {intl.formatMessage({ id: 'pages.sync.dateRange' })}
+                                </Select.Option>
+                              </Select>
+                            </Col>
+                            <Col span={8}>
+                              {currentQueryOperator !== 'dateRange' ? (
+                                <Input
+                                  placeholder={intl.formatMessage({ id: 'pages.sync.value' })}
+                                  value={currentQueryValue}
+                                  onChange={(e) => setCurrentQueryValue(e.target.value)}
+                                  autoComplete="off"
+                                />
+                              ) : (
+                                <Select
+                                  value={currentQueryValue || 'daily'}
+                                  onChange={(value) => setCurrentQueryValue(value)}
+                                  style={{ width: '100%' }}
+                                >
+                                  <Select.Option value="Yesterday">
+                                    {intl.formatMessage({ id: 'pages.sync.yesterday' })}
+                                  </Select.Option>
+                                  <Select.Option value="daily">
+                                    {intl.formatMessage({ id: 'pages.sync.daily' })}
+                                  </Select.Option>
+                                  <Select.Option value="weekly">
+                                    {intl.formatMessage({ id: 'pages.sync.weekly' })}
+                                  </Select.Option>
+                                  <Select.Option value="monthly">
+                                    {intl.formatMessage({ id: 'pages.sync.monthly' })}
+                                  </Select.Option>
+                                </Select>
+                              )}
+                            </Col>
+                            <Col span={2}>
+                              <Button
+                                type="primary"
+                                icon={<PlusOutlined />}
+                                onClick={addCondition}
+                                disabled={!currentQueryField}
+                                title={
+                                  !currentQueryField
+                                    ? intl.formatMessage({ id: 'pages.sync.fieldRequired' })
+                                    : ''
+                                }
+                              />
+                            </Col>
+                          </Row>
+                        </div>
+
+                        {/* 当前表的条件列表 */}
+                        <div style={{ marginTop: 20 }}>
+                          <Typography.Title
+                            level={5}
+                            style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '12px' }}
+                          >
+                            {intl.formatMessage({ id: 'pages.sync.conditionList' })}
+                          </Typography.Title>
+
+                          <div
+                            style={{
+                              border: '1px solid #f0f0f0',
+                              borderRadius: '4px',
+                              overflow: 'hidden',
+                              background: '#fff',
+                            }}
+                          >
+                            {conditions.filter((c) => c.table === currentQueryTable).length ===
+                            0 ? (
+                              <div style={{ textAlign: 'center', padding: '16px', color: '#999' }}>
+                                {intl.formatMessage({ id: 'pages.sync.noConditions' })}
+                              </div>
+                            ) : (
+                              conditions
+                                .filter((c) => c.table === currentQueryTable)
+                                .map((condition, localIndex) => {
+                                  // 找到全局索引，用于删除条件
+                                  const globalIndex = conditions.findIndex(
+                                    (c) =>
+                                      c.table === condition.table &&
+                                      c.field === condition.field &&
+                                      c.operator === condition.operator &&
+                                      c.value === condition.value,
+                                  );
+
+                                  return (
+                                    <div
+                                      key={localIndex}
+                                      style={{
+                                        padding: '10px 16px',
+                                        borderBottom:
+                                          localIndex <
+                                          conditions.filter((c) => c.table === currentQueryTable)
+                                            .length -
+                                            1
+                                            ? '1px solid #f0f0f0'
+                                            : 'none',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                      }}
+                                    >
+                                      <div
+                                        style={{
+                                          display: 'inline-block',
+                                          padding: '2px 12px',
+                                          backgroundColor: '#f9f9f9',
+                                          borderRadius: '4px',
+                                          marginRight: '8px',
+                                          border: '1px solid #e0e0e0',
+                                          fontSize: '12px',
+                                          height: '24px',
+                                          lineHeight: '20px',
+                                        }}
+                                      >
+                                        {condition.field}
+                                      </div>
+                                      <div
+                                        style={{
+                                          display: 'inline-block',
+                                          padding: '2px 12px',
+                                          backgroundColor: '#e6f7ff',
+                                          borderRadius: '4px',
+                                          marginRight: '8px',
+                                          border: '1px solid #91d5ff',
+                                          fontSize: '12px',
+                                          height: '24px',
+                                          lineHeight: '20px',
+                                          color: '#1890ff',
+                                        }}
+                                      >
+                                        {condition.operator}
+                                      </div>
+                                      <div
+                                        style={{
+                                          display: 'inline-block',
+                                          padding: '2px 12px',
+                                          backgroundColor: '#f6ffed',
+                                          borderRadius: '4px',
+                                          marginRight: '8px',
+                                          border: '1px solid #b7eb8f',
+                                          fontSize: '12px',
+                                          height: '24px',
+                                          lineHeight: '20px',
+                                          color: '#52c41a',
+                                        }}
+                                      >
+                                        {condition.value}
+                                      </div>
+                                      <Button
+                                        type="text"
+                                        danger
+                                        icon={<DeleteOutlined style={{ fontSize: '14px' }} />}
+                                        onClick={() => removeCondition(globalIndex)}
+                                        style={{
+                                          marginLeft: 'auto',
+                                          padding: '0',
+                                          height: '24px',
+                                          width: '24px',
+                                        }}
+                                      />
+                                    </div>
+                                  );
+                                })
+                            )}
+                          </div>
+                        </div>
+                      </>
                     ) : (
-                      <TableSchemaComponent
-                        table={fieldsMockData[tableName] || []}
-                        advancedSecurityEnabled={showSecurityOptions}
+                      <Empty
+                        description={intl.formatMessage({ id: 'pages.sync.selectTableFirst' })}
+                        image={Empty.PRESENTED_IMAGE_SIMPLE}
                       />
                     )}
-                  </Collapse.Panel>
-                );
-              })}
-            </Collapse>
-          </div>
-        )}
+                  </div>
+                </Tabs.TabPane>
+
+                {/* 高级设置选项卡 */}
+                <Tabs.TabPane
+                  tab={
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        padding: '2px 6px',
+                        fontWeight: 500,
+                        fontSize: '12px',
+                      }}
+                    >
+                      <SettingOutlined style={{ fontSize: '12px' }} />
+                      <span>{intl.formatMessage({ id: 'pages.sync.advancedSettingsTab' })}</span>
+                    </div>
+                  }
+                  key="advanced"
+                  disabled={!currentQueryTable}
+                  forceRender
+                >
+                  <div
+                    className="tab-content-wrapper"
+                    style={{
+                      height: '300px',
+                      overflowY: 'scroll',
+                      background: '#fff',
+                      border: '1px solid #d9d9d9',
+                      borderTop: 'none',
+                      padding: '16px',
+                    }}
+                  >
+                    {currentQueryTable ? (
+                      <>
+                        <div style={{ marginBottom: '12px' }}>
+                          <Typography.Text type="secondary" style={{ fontSize: '14px' }}>
+                            {intl.formatMessage(
+                              { id: 'pages.sync.advancedSettingsDesc' },
+                              {
+                                defaultMessage: '配置表的高级同步选项，包括索引同步和删除操作处理',
+                              },
+                            )}
+                          </Typography.Text>
+                        </div>
+                        <Typography.Title
+                          level={5}
+                          style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '16px' }}
+                        >
+                          {intl.formatMessage(
+                            { id: 'pages.sync.advancedSettings' },
+                            { defaultMessage: 'Advanced Settings' },
+                          )}
+                        </Typography.Title>
+
+                        <div
+                          style={{
+                            border: '1px solid #f0f0f0',
+                            borderRadius: '4px',
+                            padding: '16px',
+                            background: '#fafafa',
+                          }}
+                        >
+                          {/* Setting 1: Sync Indexes */}
+                          <Row align="middle" style={{ marginBottom: '16px' }}>
+                            <Col span={18}>
+                              <div>
+                                <Typography.Text strong>
+                                  {intl.formatMessage(
+                                    { id: 'pages.sync.syncIndexes' },
+                                    { defaultMessage: 'Sync Indexes' },
+                                  )}
+                                </Typography.Text>
+                                <div>
+                                  <Typography.Text type="secondary" style={{ fontSize: '12px' }}>
+                                    {intl.formatMessage(
+                                      { id: 'pages.sync.syncIndexesDesc' },
+                                      { defaultMessage: '同步数据库索引结构' },
+                                    )}
+                                  </Typography.Text>
+                                </div>
+                              </div>
+                            </Col>
+                            <Col span={6} style={{ textAlign: 'right' }}>
+                              <Switch
+                                checked={
+                                  tableAdvancedSettings[currentQueryTable]?.syncIndexes ?? false
+                                }
+                                onChange={(checked) => {
+                                  setTableAdvancedSettings((prev) => ({
+                                    ...prev,
+                                    [currentQueryTable]: {
+                                      ...(prev[currentQueryTable] || { ignoreDeleteOps: false }),
+                                      syncIndexes: checked,
+                                    },
+                                  }));
+                                }}
+                              />
+                            </Col>
+                          </Row>
+
+                          {/* Setting 2: Ignore Delete Operations */}
+                          <Row align="middle">
+                            <Col span={18}>
+                              <div>
+                                <Typography.Text strong>
+                                  {intl.formatMessage(
+                                    { id: 'pages.sync.ignoreDeleteOps' },
+                                    { defaultMessage: 'Ignore Delete Operations' },
+                                  )}
+                                </Typography.Text>
+                                <div>
+                                  <Typography.Text type="secondary" style={{ fontSize: '12px' }}>
+                                    {intl.formatMessage(
+                                      { id: 'pages.sync.ignoreDeleteOpsDesc' },
+                                      { defaultMessage: '忽略删除操作，只同步新增和更新' },
+                                    )}
+                                  </Typography.Text>
+                                </div>
+                              </div>
+                            </Col>
+                            <Col span={6} style={{ textAlign: 'right' }}>
+                              <Switch
+                                checked={
+                                  tableAdvancedSettings[currentQueryTable]?.ignoreDeleteOps ?? false
+                                }
+                                onChange={(checked) => {
+                                  setTableAdvancedSettings((prev) => ({
+                                    ...prev,
+                                    [currentQueryTable]: {
+                                      ...(prev[currentQueryTable] || { syncIndexes: false }),
+                                      ignoreDeleteOps: checked,
+                                    },
+                                  }));
+                                }}
+                              />
+                            </Col>
+                          </Row>
+                        </div>
+                      </>
+                    ) : (
+                      <Empty
+                        description={intl.formatMessage({ id: 'pages.sync.selectTableFirst' })}
+                        image={Empty.PRESENTED_IMAGE_SIMPLE}
+                      />
+                    )}
+                  </div>
+                </Tabs.TabPane>
+              </Tabs>
+            </div>
+          )}
+        </div>
       </StepsForm.StepForm>
     </StepsForm>
   );

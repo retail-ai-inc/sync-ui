@@ -18,6 +18,11 @@ import {
   RedoOutlined,
   SettingOutlined,
   ClockCircleOutlined,
+  PoweroffOutlined,
+  PlayCircleOutlined,
+  BarChartOutlined,
+  EditOutlined,
+  DeleteOutlined,
 } from '@ant-design/icons';
 import AddSync from './AddSync';
 import {
@@ -249,6 +254,7 @@ const SyncList: React.FC = () => {
       dataIndex: 'taskName',
       key: 'taskName',
       ellipsis: true,
+      width: 150,
       render: (text: string) => (
         <Tooltip title={text}>
           <span>{text}</span>
@@ -259,12 +265,14 @@ const SyncList: React.FC = () => {
       title: 'Source Type',
       dataIndex: 'sourceType',
       key: 'sourceType',
+      width: 150,
     },
     {
       title: 'Source',
       dataIndex: 'source',
       key: 'source',
       ellipsis: true,
+      width: 150,
       render: (_: any, record: SyncItem) => {
         const text = record.sourceConn?.host || '';
         return (
@@ -279,6 +287,7 @@ const SyncList: React.FC = () => {
       dataIndex: 'target',
       key: 'target',
       ellipsis: true,
+      width: 150,
       render: (_: any, record: SyncItem) => {
         const text = record.targetConn?.host || '';
         return (
@@ -292,6 +301,7 @@ const SyncList: React.FC = () => {
       title: 'Status',
       dataIndex: 'status',
       key: 'status',
+      width: 100,
       render: (_: any, record: SyncItem) => {
         return <Tag color={statusColorMap[record.status] || 'default'}>{record.status}</Tag>;
       },
@@ -300,52 +310,89 @@ const SyncList: React.FC = () => {
       title: 'Last Update Time',
       dataIndex: 'lastUpdateTime',
       key: 'lastUpdateTime',
+      width: 200,
     },
     {
       title: 'Last Run Time',
       dataIndex: 'lastRunTime',
       key: 'lastRunTime',
+      width: 150,
     },
     {
       title: 'Action',
       key: 'action',
+      fixed: 'right' as const,
+      width: 150,
       render: (_: any, record: SyncItem) => (
         <Space>
           {record.status === 'Running' ? (
-            <Button
-              onClick={() => handleStop(record.id)}
-              danger
-              disabled={isGuest}
-              title={isGuest ? 'Guest用户无权操作' : ''}
-            >
-              Stop
-            </Button>
+            <Tooltip title="Stop">
+              <Button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleStop(record.id);
+                }}
+                danger
+                size="small"
+                type="text"
+                icon={<PoweroffOutlined />}
+                disabled={isGuest}
+                title={isGuest ? 'Guest用户无权操作' : ''}
+              />
+            </Tooltip>
           ) : (
+            <Tooltip title="Start">
+              <Button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleStart(record.id);
+                }}
+                type="text"
+                size="small"
+                icon={<PlayCircleOutlined />}
+                disabled={isGuest}
+                title={isGuest ? 'Guest用户无权操作' : ''}
+              />
+            </Tooltip>
+          )}
+          <Tooltip title="Monitor">
             <Button
-              onClick={() => handleStart(record.id)}
-              type="primary"
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(`/Sync/monitor?taskId=${record.id}`);
+              }}
+              type="text"
+              size="small"
+              icon={<BarChartOutlined />}
+            />
+          </Tooltip>
+          <Tooltip title="Edit">
+            <Button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleEdit(record);
+              }}
+              type="text"
+              size="small"
+              icon={<EditOutlined />}
               disabled={isGuest}
               title={isGuest ? 'Guest用户无权操作' : ''}
-            >
-              Start
-            </Button>
-          )}
-          <Button onClick={() => navigate(`/Sync/monitor?taskId=${record.id}`)}>Monitor</Button>
-          <Button
-            onClick={() => handleEdit(record)}
-            disabled={isGuest}
-            title={isGuest ? 'Guest用户无权操作' : ''}
-          >
-            Edit
-          </Button>
-          <Button
-            danger
-            onClick={() => handleDelete(record)}
-            disabled={isGuest}
-            title={isGuest ? 'Guest用户无权操作' : ''}
-          >
-            Delete
-          </Button>
+            />
+          </Tooltip>
+          <Tooltip title="Delete">
+            <Button
+              type="text"
+              danger
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDelete(record);
+              }}
+              size="small"
+              icon={<DeleteOutlined />}
+              disabled={isGuest}
+              title={isGuest ? 'Guest用户无权操作' : ''}
+            />
+          </Tooltip>
         </Space>
       ),
     },
@@ -534,7 +581,7 @@ const SyncList: React.FC = () => {
           rowKey={(record) => record.id}
           loading={loading}
           pagination={false}
-          scroll={{ x: 'max-content' }}
+          scroll={{ x: 1200, y: 500 }}
           expandable={{
             expandedRowRender,
             onExpand: (expanded, record) => {

@@ -72,5 +72,6 @@ export default [
     name: 'SQLDebugTool',
     icon: 'CodeOutlined',
     component: './SqlDebug',
+    hideInMenu: true,
   },
 ];

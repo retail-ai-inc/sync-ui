@@ -411,11 +411,14 @@ const JobList: React.FC = () => {
 
       if (result.success) {
         // 将API返回数据格式映射到应用所需格式
-        const mappedData = result.data.map((item: any) => {
+        // 确保result.data是数组，如果为null或undefined则使用空数组
+        const rawData = Array.isArray(result.data) ? result.data : [];
+
+        const mappedData = rawData.map((item: any) => {
           // 处理fields字段，确保格式正确
           const fields: { [table: string]: string[] } = {};
 
-          if (item.database.fields) {
+          if (item.database && item.database.fields) {
             Object.keys(item.database.fields).forEach((table) => {
               if (typeof item.database.fields[table] === 'string') {
                 // 如果是字符串，转换为数组
@@ -429,13 +432,13 @@ const JobList: React.FC = () => {
 
           return {
             id: item.id,
-            name: item.name,
+            name: item.name || '',
             database: {
-              url: item.database.url,
-              username: item.database.username,
-              password: item.database.password,
-              database: item.database.database,
-              tables: item.database.tables || [],
+              url: item.database?.url || '',
+              username: item.database?.username || '',
+              password: item.database?.password || '',
+              database: item.database?.database || '',
+              tables: item.database?.tables || [],
               fields: fields, // 使用处理后的fields
             },
             destination: {
@@ -443,22 +446,22 @@ const JobList: React.FC = () => {
               serviceAccount: item.destination?.serviceAccount || '',
               retention: item.destination?.retention || 30,
             },
-            schedule: item.schedule,
+            schedule: item.schedule || '',
             lastExecution: item.lastBackupTime
               ? {
-                  status: 'success', // 假设有备份时间表示成功
+                  status: 'success' as ExecutionStatus, // 假设有备份时间表示成功
                   time: item.lastBackupTime,
                   message: '',
                 }
               : undefined,
-            nextExecution: item.nextBackupTime,
-            status: item.status as JobStatus,
-            fileType: item.format || 'sql',
-            backupType: item.backupType || 'full', // 处理备份类型
+            nextExecution: item.nextBackupTime || '',
+            status: (item.status as JobStatus) || 'disabled',
+            fileType: (item.format as 'json' | 'bson' | 'csv') || 'json',
+            backupType: (item.backupType as 'full' | 'incremental') || 'full', // 处理备份类型
             query: item.query || '{}', // 处理查询条件
-            sourceType: item.sourceType, // 直接使用API返回的源类型，不设置默认值
-            createdAt: item.lastUpdateTime,
-            updatedAt: item.lastUpdateTime,
+            sourceType: item.sourceType as 'mongodb' | 'mysql' | 'postgresql', // 直接使用API返回的源类型
+            createdAt: item.lastUpdateTime || '',
+            updatedAt: item.lastUpdateTime || '',
           };
         });
 
@@ -466,17 +469,20 @@ const JobList: React.FC = () => {
         setFilteredJobs(mappedData);
 
         console.log('获取到的任务数据:', mappedData);
-        console.log(
-          '字段映射结果示例:',
-          mappedData.length > 0 ? mappedData[0].database.fields : {},
-        );
+        if (mappedData.length > 0) {
+          console.log('字段映射结果示例:', mappedData[0].database.fields || {});
+        } else {
+          console.log('没有找到任何备份任务');
+        }
       } else {
+        // 只有在API明确返回错误时才显示错误消息
         console.error('获取任务列表失败:', result.message);
         message.error(
           result.message || intl.formatMessage({ id: 'pages.backup.messages.fetchFailed' }),
         );
       }
     } catch (error) {
+      // 只有在网络错误或解析错误时才显示错误消息
       console.error('获取任务列表失败:', error);
       message.error(intl.formatMessage({ id: 'pages.backup.messages.fetchFailed' }));
     } finally {
@@ -1325,10 +1331,10 @@ const JobList: React.FC = () => {
       render: (text) => <a>{text}</a>,
     },
     {
-      title: intl.formatMessage({ id: 'pages.backup.jobList.lastExecStatus' }),
+      title: <span style={{ whiteSpace: 'nowrap' }}>Last Exec Status</span>,
       dataIndex: 'lastExecution',
       key: 'status',
-      width: 150,
+      width: 130,
       render: (lastExecution) => {
         if (!lastExecution) {
           return (
@@ -1460,16 +1466,20 @@ const JobList: React.FC = () => {
     {
       title: intl.formatMessage({ id: 'pages.backup.jobList.actions' }),
       key: 'action',
-      width: 160,
-      // fixed: 'right',
+      width: 150,
+      fixed: 'right' as const,
       render: (_, record) => (
-        <Space size="small">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           {record.status === 'enabled' ? (
             <Tooltip title={intl.formatMessage({ id: 'pages.backup.tooltip.pause' })}>
               <Button
                 type="text"
                 icon={<PauseCircleOutlined />}
-                onClick={() => toggleJobStatus(record.id, record.status)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleJobStatus(record.id, record.status);
+                }}
+                className="action-button"
               />
             </Tooltip>
           ) : (
@@ -1477,7 +1487,11 @@ const JobList: React.FC = () => {
               <Button
                 type="text"
                 icon={<PlayCircleOutlined />}
-                onClick={() => toggleJobStatus(record.id, record.status)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleJobStatus(record.id, record.status);
+                }}
+                className="action-button"
               />
             </Tooltip>
           )}
@@ -1489,21 +1503,33 @@ const JobList: React.FC = () => {
                 (record.lastExecution && record.lastExecution.status === 'running') ||
                 record.status === 'paused'
               }
-              onClick={() => runJobNow(record.id)}
+              onClick={(e) => {
+                e.stopPropagation();
+                runJobNow(record.id);
+              }}
+              className="action-button"
             />
           </Tooltip>
           <Tooltip title={intl.formatMessage({ id: 'pages.backup.tooltip.openGcs' })}>
             <Button
               type="text"
               icon={<HistoryOutlined />}
-              onClick={() => viewJobHistory(record.id)}
+              onClick={(e) => {
+                e.stopPropagation();
+                viewJobHistory(record.id);
+              }}
+              className="action-button"
             />
           </Tooltip>
           <Tooltip title={intl.formatMessage({ id: 'pages.backup.tooltip.edit' })}>
             <Button
               type="text"
               icon={<EditOutlined />}
-              onClick={() => showEditJobModal(record.id)}
+              onClick={(e) => {
+                e.stopPropagation();
+                showEditJobModal(record.id);
+              }}
+              style={{ padding: '4px 8px', lineHeight: '1' }}
             />
           </Tooltip>
           <Tooltip title={intl.formatMessage({ id: 'pages.backup.tooltip.delete' })}>
@@ -1511,7 +1537,8 @@ const JobList: React.FC = () => {
               type="text"
               danger
               icon={<DeleteOutlined />}
-              onClick={() => {
+              onClick={(e) => {
+                e.stopPropagation();
                 Modal.confirm({
                   title: intl.formatMessage({ id: 'pages.backup.confirm.deleteTitle' }),
                   content: intl.formatMessage({ id: 'pages.backup.confirm.deleteContent' }),
@@ -1520,9 +1547,10 @@ const JobList: React.FC = () => {
                   onOk: () => handleDeleteJob(record.id),
                 });
               }}
+              style={{ padding: '4px 8px', lineHeight: '1' }}
             />
           </Tooltip>
-        </Space>
+        </div>
       ),
     },
   ];
@@ -1585,11 +1613,14 @@ const JobList: React.FC = () => {
 
       if (result.success) {
         // 将API返回数据格式映射到应用所需格式
-        const mappedData = result.data.map((item: any) => {
+        // 确保result.data是数组，如果为null或undefined则使用空数组
+        const rawData = Array.isArray(result.data) ? result.data : [];
+
+        const mappedData = rawData.map((item: any) => {
           // 处理fields字段，确保格式正确
           const fields: { [table: string]: string[] } = {};
 
-          if (item.database.fields) {
+          if (item.database && item.database.fields) {
             Object.keys(item.database.fields).forEach((table) => {
               if (typeof item.database.fields[table] === 'string') {
                 // 如果是字符串，转换为数组
@@ -1603,13 +1634,13 @@ const JobList: React.FC = () => {
 
           return {
             id: item.id,
-            name: item.name,
+            name: item.name || '',
             database: {
-              url: item.database.url,
-              username: item.database.username,
-              password: item.database.password,
-              database: item.database.database,
-              tables: item.database.tables || [],
+              url: item.database?.url || '',
+              username: item.database?.username || '',
+              password: item.database?.password || '',
+              database: item.database?.database || '',
+              tables: item.database?.tables || [],
               fields: fields, // 使用处理后的fields
             },
             destination: {
@@ -1617,22 +1648,22 @@ const JobList: React.FC = () => {
               serviceAccount: item.destination?.serviceAccount || '',
               retention: item.destination?.retention || 30,
             },
-            schedule: item.schedule,
+            schedule: item.schedule || '',
             lastExecution: item.lastBackupTime
               ? {
-                  status: 'success', // 假设有备份时间表示成功
+                  status: 'success' as ExecutionStatus, // 假设有备份时间表示成功
                   time: item.lastBackupTime,
                   message: '',
                 }
               : undefined,
-            nextExecution: item.nextBackupTime,
-            status: item.status as JobStatus,
-            fileType: item.format || 'sql',
-            backupType: item.backupType || 'full', // 处理备份类型
+            nextExecution: item.nextBackupTime || '',
+            status: (item.status as JobStatus) || 'disabled',
+            fileType: (item.format as 'json' | 'bson' | 'csv') || 'json',
+            backupType: (item.backupType as 'full' | 'incremental') || 'full', // 处理备份类型
             query: item.query || '{}', // 处理查询条件
-            sourceType: item.sourceType, // 直接使用API返回的源类型，不设置默认值
-            createdAt: item.lastUpdateTime,
-            updatedAt: item.lastUpdateTime,
+            sourceType: item.sourceType as 'mongodb' | 'mysql' | 'postgresql', // 直接使用API返回的源类型
+            createdAt: item.lastUpdateTime || '',
+            updatedAt: item.lastUpdateTime || '',
           };
         });
 
@@ -1656,12 +1687,14 @@ const JobList: React.FC = () => {
 
         message.success(intl.formatMessage({ id: 'pages.backup.messages.refreshSuccess' }));
       } else {
+        // 只有在API明确返回错误时才显示错误消息
         console.error('刷新任务列表失败:', result.message);
         message.error(
           result.message || intl.formatMessage({ id: 'pages.backup.messages.refreshFailed' }),
         );
       }
     } catch (error) {
+      // 只有在网络错误或解析错误时才显示错误消息
       console.error('刷新任务列表失败:', error);
       message.error(intl.formatMessage({ id: 'pages.backup.messages.refreshFailed' }));
     } finally {
@@ -2116,8 +2149,45 @@ const JobList: React.FC = () => {
     updateQueryString(newFields);
   };
 
+  // 在return语句之前添加以下CSS样式
+  const tableStyles = `
+    /* 强制固定列保持样式一致 */
+    .backup-table .ant-table-cell-fix-right {
+      background-color: #fff !important;
+      z-index: 10 !important;
+    }
+    .backup-table .ant-table-thead > tr > th.ant-table-cell-fix-right {
+      background-color: #fafafa !important;
+    }
+    .backup-table .ant-table-tbody > tr:hover > td.ant-table-cell-fix-right {
+      background-color: #f5f5f5 !important;
+    }
+    
+    /* 确保按钮在同一高度对齐 */
+    .action-button {
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      height: 28px !important;
+      width: 28px !important;
+      padding: 0 !important;
+      margin: 0 4px !important;
+      vertical-align: middle !important;
+    }
+    
+    /* 强制删除按钮与其他按钮保持相同的高度和位置 */
+    .action-button.danger {
+      color: #ff4d4f !important;
+    }
+    .action-button.danger:hover {
+      color: #ff7875 !important;
+      background: rgba(255, 77, 79, 0.1) !important;
+    }
+  `;
+
   return (
     <div className="job-list-container">
+      <style>{tableStyles}</style>
       <Card
         title={intl.formatMessage({ id: 'pages.backup.jobList.title' })}
         extra={
@@ -2162,8 +2232,21 @@ const JobList: React.FC = () => {
           rowKey="id"
           loading={loading}
           pagination={{ pageSize: 10 }}
-          scroll={{ x: 1650 }}
+          scroll={{ x: 1650, y: 500 }}
           bordered
+          sticky
+          className="backup-table"
+          onRow={(record) => ({
+            onClick: (e) => {
+              // 如果点击来自按钮，不做任何处理
+              if ((e.target as HTMLElement).closest('button')) {
+                return;
+              }
+
+              // 可以在这里添加行点击事件处理
+              console.log('Row clicked:', record.id);
+            },
+          })}
         />
       </Card>
 

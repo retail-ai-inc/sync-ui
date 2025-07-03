@@ -65,4 +65,12 @@ export default {
   'pages.searchTable.tenThousand': '万',
   'pages.searchTable.batchDeletion': 'バッチ削除',
   'pages.searchTable.batchApproval': 'バッチ承認',
+
+  // Backup related internationalization
+  'pages.backup.form.fileNamePattern': 'ファイル名パターン（正規表現）',
+  'pages.backup.form.fileNamePattern.required': 'ファイル名パターンを入力してください',
+  'pages.backup.form.fileNamePattern.placeholder': '例：^backup_\\d{4}-\\d{2}-\\d{2}_.*\\.json$',
+  'pages.backup.form.fileNamePattern.invalid': '無効な正規表現',
+  'pages.backup.form.fileNamePattern.tooltip':
+    'バックアップファイル名にマッチする正規表現パターン。マウスホバーでマッチング例を表示。',
 };

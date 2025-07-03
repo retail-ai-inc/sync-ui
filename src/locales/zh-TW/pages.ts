@@ -87,4 +87,12 @@ export default {
   'pages.userManage.cancel': '取消',
   'pages.userManage.apply': '應用變更',
   'pages.userManage.title': '用戶管理',
+
+  // Backup related internationalization
+  'pages.backup.form.fileNamePattern': '檔案名稱模式（正規表示式）',
+  'pages.backup.form.fileNamePattern.required': '請輸入檔案名稱模式',
+  'pages.backup.form.fileNamePattern.placeholder': '例如：^backup_\\d{4}-\\d{2}-\\d{2}_.*\\.json$',
+  'pages.backup.form.fileNamePattern.invalid': '無效的正規表示式',
+  'pages.backup.form.fileNamePattern.tooltip':
+    '用於匹配備份檔案名稱的正規表示式模式。滑鼠懸停可查看匹配範例。',
 };

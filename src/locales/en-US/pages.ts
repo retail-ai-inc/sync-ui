@@ -409,6 +409,7 @@ export default {
   'pages.backup.tabs.basic': 'Basic Information',
   'pages.backup.tabs.dataSelection': 'Data Selection',
   'pages.backup.tabs.destination': 'Target Location',
+  'pages.backup.tabs.dataSelectionAndDestination': 'Data Selection & Target Location',
 
   'pages.backup.form.name': 'Task Name',
   'pages.backup.form.name.required': 'Please enter task name',
@@ -437,14 +438,18 @@ export default {
   'pages.backup.form.gcsPath.placeholder': 'e.g., gs://your-bucket/path/to/backups/',
   'pages.backup.form.gcsPath.tooltip':
     'The Google Cloud Storage location where backup files will be stored',
-  'pages.backup.form.serviceAccount': 'GCS Service Account',
-  'pages.backup.form.serviceAccount.required': 'Please enter GCS service account',
-  'pages.backup.form.serviceAccount.placeholder':
-    'e.g., backup-service@your-project.iam.gserviceaccount.com',
+  'pages.backup.form.fileNamePattern': 'File Name Pattern (Regex)',
+  'pages.backup.form.fileNamePattern.required': 'Please enter file name pattern',
+  'pages.backup.form.fileNamePattern.placeholder': 'e.g., ^backup_\\d{4}-\\d{2}-\\d{2}_.*\\.json$',
+  'pages.backup.form.fileNamePattern.invalid': 'Invalid regular expression',
+  'pages.backup.form.fileNamePattern.tooltip':
+    'Regular expression pattern to match backup file names. Hover to see matching examples.',
   'pages.backup.form.retention': 'Retention Days',
   'pages.backup.form.retention.required': 'Please enter retention days',
   'pages.backup.form.retention.tooltip':
     'Backups older than the retention period will be automatically deleted',
+
+  'pages.backup.destination.help': 'Configure Google Cloud Storage settings for backup files',
 
   'pages.sync.queryBuilder': 'Query Builder',
   'pages.sync.queryBuilderHelp':
@@ -453,6 +458,9 @@ export default {
   'pages.sync.selectCollection': 'Select a collection to show fields',
   'pages.backup.dataSelection.collections': 'Collection Selection',
   'pages.backup.dataSelection.collections.help': 'Select collections to backup from the left',
+  'pages.backup.dataSelection.collections.name': 'Collection Name',
+  'pages.backup.dataSelection.collections.fields': 'Fields',
+  'pages.backup.dataSelection.collections.queries': 'Queries',
   'pages.backup.dataSelection.fields': 'Field Selection',
   'pages.backup.dataSelection.fields.help': 'Select fields to backup',
   'pages.backup.dataSelection.selectCollection': 'Select a collection to view fields:',
@@ -560,8 +568,6 @@ export default {
   'pages.backup.form.port.required': 'Port is required',
   'pages.backup.form.port.placeholder': 'Enter port (e.g., 27017)',
   'pages.backup.dataSelection.selectTable.placeholder': 'Select tables/collections',
-  'pages.backup.form.serviceAccount.tooltip':
-    'Enter the Google Cloud service account key in JSON format',
 
   // Confirmation dialogs
   'pages.backup.confirm.deleteTitle': 'Confirm Deletion',
@@ -597,6 +603,7 @@ export default {
   'pages.backup.query.fieldRequired': 'Please enter field name',
   'pages.backup.query.addButton': 'Add',
   'pages.backup.query.conditionList': 'Condition List',
+  'pages.backup.query.noConditions': 'No conditions configured',
   'pages.backup.query.invalidDateRange': 'Invalid date range format',
   'pages.backup.common.delete': 'Delete',
 
@@ -638,6 +645,10 @@ export default {
   'pages.sync.configAdvanced': 'Configure Advanced Settings',
   'pages.sync.ignoreDeleteOpsDesc': 'Skip delete operations during sync',
   'pages.sync.ignoreDeleteOps': 'Ignore Delete Operations',
+  'pages.sync.uploadToGcs': 'Upload to Google Cloud Storage',
+  'pages.sync.uploadToGcsDesc': 'Upload changestream data to Google Cloud Storage',
+  'pages.sync.gcsAddress': 'GCS Address',
+  'pages.sync.gcsAddressPlaceholder': 'e.g., gs://bucket-name/path/',
   'pages.sync.tableOverviewDesc': 'View configuration status overview for all selected tables',
   'pages.sync.tableSchemaDesc': 'Configure security options for table fields',
   'pages.sync.queryConditionsDesc': 'Configure custom query conditions for data filtering',

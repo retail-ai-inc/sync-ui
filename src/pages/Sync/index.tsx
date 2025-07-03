@@ -175,21 +175,45 @@ const SyncList: React.FC = () => {
   }, []);
 
   // Start task
-  const handleStart = async (id: number) => {
-    const res = await startSync(id);
-    if (res.success) {
-      message.success(res.data.msg);
-      loadData();
-    }
+  const handleStart = async (record: SyncItem) => {
+    Modal.confirm({
+      title: 'Confirm to start this sync task?',
+      content: record.taskName ? `Task Name: ${record.taskName}` : undefined,
+      onOk: async () => {
+        try {
+          const res = await startSync(record.id);
+          if (res.success) {
+            message.success(res.data.msg);
+            loadData();
+          } else {
+            message.error('Start failed');
+          }
+        } catch (err) {
+          message.error('Start failed');
+        }
+      },
+    });
   };
 
   // Stop task
-  const handleStop = async (id: number) => {
-    const res = await stopSync(id);
-    if (res.success) {
-      message.success(res.data.msg);
-      loadData();
-    }
+  const handleStop = async (record: SyncItem) => {
+    Modal.confirm({
+      title: 'Confirm to stop this sync task?',
+      content: record.taskName ? `Task Name: ${record.taskName}` : undefined,
+      onOk: async () => {
+        try {
+          const res = await stopSync(record.id);
+          if (res.success) {
+            message.success(res.data.msg);
+            loadData();
+          } else {
+            message.error('Stop failed');
+          }
+        } catch (err) {
+          message.error('Stop failed');
+        }
+      },
+    });
   };
 
   // Edit
@@ -330,7 +354,7 @@ const SyncList: React.FC = () => {
               <Button
                 onClick={(e) => {
                   e.stopPropagation();
-                  handleStop(record.id);
+                  handleStop(record);
                 }}
                 danger
                 size="small"
@@ -345,7 +369,7 @@ const SyncList: React.FC = () => {
               <Button
                 onClick={(e) => {
                   e.stopPropagation();
-                  handleStart(record.id);
+                  handleStart(record);
                 }}
                 type="text"
                 size="small"

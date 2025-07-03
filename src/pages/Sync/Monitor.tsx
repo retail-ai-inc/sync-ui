@@ -18,6 +18,7 @@ import {
   Radio,
   Switch,
   Checkbox,
+  Modal,
 } from 'antd';
 import { useSearchParams, useNavigate, useAccess } from '@umijs/max';
 import {
@@ -193,33 +194,45 @@ const Monitor: React.FC = () => {
   // Pause => call stopSync
   const handlePause = async () => {
     if (!taskId) return;
-    try {
-      const res = await stopSync(Number(taskId));
-      if (res.success) {
-        message.success(res.data.msg || 'Paused successfully');
-        loadMonitor();
-      } else {
-        message.error('Pause failed');
-      }
-    } catch {
-      message.error('Pause failed');
-    }
+    Modal.confirm({
+      title: 'Confirm to pause this sync task?',
+      content: `Task ID: ${taskId}`,
+      onOk: async () => {
+        try {
+          const res = await stopSync(Number(taskId));
+          if (res.success) {
+            message.success(res.data.msg || 'Paused successfully');
+            loadMonitor();
+          } else {
+            message.error('Pause failed');
+          }
+        } catch {
+          message.error('Pause failed');
+        }
+      },
+    });
   };
 
   // Resume => call startSync
   const handleResume = async () => {
     if (!taskId) return;
-    try {
-      const res = await startSync(Number(taskId));
-      if (res.success) {
-        message.success(res.data.msg || 'Resumed successfully');
-        loadMonitor();
-      } else {
-        message.error('Resume failed');
-      }
-    } catch {
-      message.error('Resume failed');
-    }
+    Modal.confirm({
+      title: 'Confirm to resume this sync task?',
+      content: `Task ID: ${taskId}`,
+      onOk: async () => {
+        try {
+          const res = await startSync(Number(taskId));
+          if (res.success) {
+            message.success(res.data.msg || 'Resumed successfully');
+            loadMonitor();
+          } else {
+            message.error('Resume failed');
+          }
+        } catch {
+          message.error('Resume failed');
+        }
+      },
+    });
   };
 
   // ========== Effects ==========

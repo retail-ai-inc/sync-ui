@@ -69,4 +69,12 @@ export default {
   'pages.searchTable.tenThousand': '0000',
   'pages.searchTable.batchDeletion': 'deleção em lote',
   'pages.searchTable.batchApproval': 'aprovação em lote',
+
+  // Backup related internationalization
+  'pages.backup.form.fileNamePattern': 'Padrão de Nome de Arquivo (Regex)',
+  'pages.backup.form.fileNamePattern.required': 'Por favor, insira o padrão do nome do arquivo',
+  'pages.backup.form.fileNamePattern.placeholder': 'ex: ^backup_\\d{4}-\\d{2}-\\d{2}_.*\\.json$',
+  'pages.backup.form.fileNamePattern.invalid': 'Expressão regular inválida',
+  'pages.backup.form.fileNamePattern.tooltip':
+    'Padrão de expressão regular para corresponder aos nomes de arquivos de backup. Passe o mouse para ver exemplos de correspondência.',
 };

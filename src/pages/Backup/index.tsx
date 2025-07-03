@@ -1,48 +1,53 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  Table,
   Card,
   Button,
+  Table,
   Space,
-  Tag,
-  Tooltip,
   Modal,
   Form,
   Input,
   Select,
-  Checkbox,
-  Divider,
   Row,
   Col,
+  Tag,
   message,
-  Empty,
-  InputNumber,
+  Tooltip,
   Transfer,
-  Popover,
+  Empty,
+  Badge,
   List,
+  Popover,
+  Checkbox,
+  Typography,
+  Tabs,
 } from 'antd';
 import { StepsForm } from '@ant-design/pro-components';
 import {
   PlusOutlined,
-  ClockCircleOutlined,
-  CheckCircleOutlined,
-  CloseCircleOutlined,
-  SyncOutlined,
   EditOutlined,
   DeleteOutlined,
-  HistoryOutlined,
-  PauseCircleOutlined,
   PlayCircleOutlined,
-  CloudUploadOutlined,
+  PauseCircleOutlined,
+  HistoryOutlined,
   SearchOutlined,
+  CloseCircleOutlined,
   ReloadOutlined,
   SettingOutlined,
+  TableOutlined,
+  DatabaseOutlined,
+  FilterOutlined,
+  CloudServerOutlined,
+  ClockCircleOutlined,
+  CheckCircleOutlined,
+  SyncOutlined,
+  CloudUploadOutlined,
 } from '@ant-design/icons';
 import { useIntl } from '@umijs/max';
 import dayjs from 'dayjs';
 import type { ColumnsType } from 'antd/es/table';
-import type { Key } from 'react';
 import type { FormInstance } from 'antd';
+import type { Key } from 'antd/es/table/interface';
 import './index.less';
 
 const { Option } = Select;
@@ -67,8 +72,7 @@ interface BackupJob {
   };
   destination: {
     gcsPath: string;
-    serviceAccount: string;
-    retention: number;
+    fileNamePattern: string; // 改为文件名正则表达式
   };
   schedule: string; // Cron 表达式
   lastExecution: {
@@ -99,8 +103,7 @@ interface JobFormData {
     [table: string]: string[];
   };
   gcsPath: string;
-  serviceAccount: string;
-  retention: number;
+  fileNamePattern: string; // 改为文件名正则表达式
   cronExpression: string;
   fileType: 'json' | 'bson' | 'csv';
   backupType: 'full' | 'incremental'; // 新增：备份类型
@@ -188,8 +191,7 @@ const JobList: React.FC = () => {
     tables: [],
     selectedFields: {},
     gcsPath: '',
-    serviceAccount: '',
-    retention: 30,
+    fileNamePattern: '',
     cronExpression: '0 2 * * *',
     fileType: 'json',
     backupType: 'full',
@@ -251,8 +253,7 @@ const JobList: React.FC = () => {
         },
         destination: {
           gcsPath: jobFormData.gcsPath,
-          serviceAccount: jobFormData.serviceAccount,
-          retention: jobFormData.retention,
+          fileNamePattern: jobFormData.fileNamePattern,
         },
       });
     }
@@ -279,8 +280,7 @@ const JobList: React.FC = () => {
           },
           destination: {
             gcsPath: jobFormData.gcsPath,
-            serviceAccount: jobFormData.serviceAccount,
-            retention: jobFormData.retention,
+            fileNamePattern: jobFormData.fileNamePattern,
           },
         });
       }
@@ -341,8 +341,7 @@ const JobList: React.FC = () => {
           tables: job.database.tables,
           selectedFields: selectedFields,
           gcsPath: job.destination.gcsPath,
-          serviceAccount: job.destination.serviceAccount,
-          retention: job.destination.retention,
+          fileNamePattern: job.destination.fileNamePattern,
           cronExpression: job.schedule,
           fileType: job.fileType,
           backupType: job.backupType,
@@ -382,8 +381,7 @@ const JobList: React.FC = () => {
         tables: job.database.tables,
         selectedFields: {}, // 需要从API获取
         gcsPath: job.destination.gcsPath,
-        serviceAccount: job.destination.serviceAccount,
-        retention: job.destination.retention,
+        fileNamePattern: job.destination.fileNamePattern,
         cronExpression: job.schedule,
         fileType: job.fileType || 'json', // 确保fileType有值
         backupType: job.backupType || 'full', // 默认为全量备份
@@ -443,7 +441,7 @@ const JobList: React.FC = () => {
             },
             destination: {
               gcsPath: item.destination?.gcsPath || '',
-              serviceAccount: item.destination?.serviceAccount || '',
+              fileNamePattern: item.destination?.fileNamePattern || '',
               retention: item.destination?.retention || 30,
             },
             schedule: item.schedule || '',
@@ -735,7 +733,7 @@ const JobList: React.FC = () => {
       tables: [],
       selectedFields: {},
       gcsPath: '',
-      serviceAccount: '',
+      fileNamePattern: '',
       retention: 30,
       cronExpression: '0 2 * * *',
       fileType: 'json',
@@ -886,7 +884,7 @@ const JobList: React.FC = () => {
       tables: job.database.tables,
       selectedFields: selectedFields,
       gcsPath: job.destination.gcsPath,
-      serviceAccount: job.destination.serviceAccount,
+      fileNamePattern: job.destination.fileNamePattern,
       retention: job.destination.retention,
       cronExpression: job.schedule,
       fileType: job.fileType || 'json', // 确保fileType有值
@@ -986,7 +984,7 @@ const JobList: React.FC = () => {
           tables: [],
           selectedFields: {},
           gcsPath: '',
-          serviceAccount: '',
+          fileNamePattern: '',
           retention: 30,
           cronExpression: '0 2 * * *',
           fileType: 'json',
@@ -1040,10 +1038,9 @@ const JobList: React.FC = () => {
         },
         destination: {
           gcsPath: isNestedStructure ? values.destination.gcsPath : values.gcsPath,
-          serviceAccount: isNestedStructure
-            ? values.destination.serviceAccount
-            : values.serviceAccount,
-          retention: isNestedStructure ? values.destination.retention : values.retention,
+          fileNamePattern: isNestedStructure
+            ? values.destination.fileNamePattern
+            : values.fileNamePattern,
         },
         schedule: isNestedStructure ? values.basic.cronExpression : values.cronExpression,
         format: isNestedStructure ? values.basic.fileType : values.fileType,
@@ -1328,14 +1325,14 @@ const JobList: React.FC = () => {
       dataIndex: 'name',
       key: 'name',
       width: 180,
-      render: (text) => <a>{text}</a>,
+      render: (text: string) => <a>{text}</a>,
     },
     {
       title: <span style={{ whiteSpace: 'nowrap' }}>Last Exec Status</span>,
       dataIndex: 'lastExecution',
       key: 'status',
       width: 130,
-      render: (lastExecution) => {
+      render: (lastExecution: any) => {
         if (!lastExecution) {
           return (
             <Tag icon={<ClockCircleOutlined />} color="default">
@@ -1645,7 +1642,7 @@ const JobList: React.FC = () => {
             },
             destination: {
               gcsPath: item.destination?.gcsPath || '',
-              serviceAccount: item.destination?.serviceAccount || '',
+              fileNamePattern: item.destination?.fileNamePattern || '',
               retention: item.destination?.retention || 30,
             },
             schedule: item.schedule || '',
@@ -1963,7 +1960,7 @@ const JobList: React.FC = () => {
           tables: [],
           selectedFields: {},
           gcsPath: '',
-          serviceAccount: '',
+          fileNamePattern: '',
           retention: 30,
           backupType: 'full',
           query: '{}',
@@ -2600,7 +2597,7 @@ const JobList: React.FC = () => {
                     tables: [],
                     selectedFields: {},
                     gcsPath: '',
-                    serviceAccount: '',
+                    fileNamePattern: '',
                     retention: 30,
                     backupType: 'full',
                     query: '{}',
@@ -2621,467 +2618,752 @@ const JobList: React.FC = () => {
           </Space>
         </StepsForm.StepForm>
 
-        {/* 步骤3：数据选择 */}
+        {/* 步骤3：数据选择与目标位置 */}
         <StepsForm.StepForm
-          name="dataSelection"
-          title={intl.formatMessage({ id: 'pages.backup.tabs.dataSelection' })}
+          name="dataSelectionAndDestination"
+          title={
+            intl.formatMessage({ id: 'pages.backup.tabs.dataSelectionAndDestination' }) ||
+            'Data Selection & Target Location'
+          }
           initialValues={{
             backupType: jobFormData.backupType || 'full',
+            gcsPath: editingJobId ? jobFormData.gcsPath : '',
+            fileNamePattern: editingJobId ? jobFormData.fileNamePattern : '',
+            retention: editingJobId ? jobFormData.retention : 30,
           }}
         >
-          <div className="collection-selection">
-            <h4>{intl.formatMessage({ id: 'pages.backup.dataSelection.collections' })}</h4>
-            <p className="help-text">
-              {intl.formatMessage({ id: 'pages.backup.dataSelection.collections.help' })}
-            </p>
-
-            <Transfer
-              dataSource={tableItems}
-              titles={[
-                intl.formatMessage({ id: 'pages.backup.dataSelection.transfer.available' }),
-                intl.formatMessage({ id: 'pages.backup.dataSelection.transfer.selected' }),
-              ]}
-              targetKeys={targetTableKeys}
-              onChange={handleTableChange}
-              filterOption={filterTableOption}
-              showSearch
-              oneWay
-              render={(item) => item.title}
-              listStyle={{
-                width: 250,
-                height: 400,
-              }}
-              operations={[
-                intl.formatMessage({ id: 'pages.backup.dataSelection.transfer.selectAdd' }),
-                intl.formatMessage({ id: 'pages.backup.dataSelection.transfer.selectRemove' }),
-              ]}
-            />
-          </div>
-
-          <Divider />
-
-          {/* 查询条件构建器 */}
-          <div
-            className="query-builder"
-            style={{ marginBottom: 24, border: '1px solid #f0f0f0', padding: 16, borderRadius: 4 }}
-          >
-            <h4>{intl.formatMessage({ id: 'pages.backup.dataSelection.queryBuilder' })}</h4>
-            <p className="help-text">
-              {intl.formatMessage({ id: 'pages.backup.dataSelection.queryBuilder.help' })}
-            </p>
-
-            {/* 选择集合（共享） */}
-            <div className="table-selector">
-              <span className="label">
-                {intl.formatMessage({ id: 'pages.backup.dataSelection.selectCollection' })}
-              </span>
-              <Select
-                placeholder={intl.formatMessage({
-                  id: 'pages.backup.dataSelection.selectTable.placeholder',
-                })}
-                style={{ width: 240, marginLeft: 8 }}
-                value={currentTable}
-                onChange={(value) => {
-                  setCurrentTable(value);
-                  setCurrentQueryTable(value);
-                  handleViewTableFields(value);
-                }}
-                disabled={targetTableKeys.length === 0}
-              >
-                {targetTableKeys.map((table) => (
-                  <Option key={table} value={table}>
-                    {table}
-                  </Option>
-                ))}
-              </Select>
-            </div>
-
-            {/* 添加新查询条件 */}
-            <div className="add-query-field">
-              <h5>{intl.formatMessage({ id: 'pages.backup.dataSelection.addQueryField' })}</h5>
-
-              <Row gutter={8} align="middle">
-                <Col span={7}>
-                  <Input
-                    placeholder={intl.formatMessage({ id: 'pages.backup.dataSelection.fieldName' })}
-                    value={currentQueryField}
-                    onChange={(e) => setCurrentQueryField(e.target.value)}
-                  />
-                </Col>
-                <Col span={6}>
-                  <Select
-                    value={currentQueryOperator}
-                    onChange={(value) => {
-                      setCurrentQueryOperator(value);
-                      // 如果选择了dateRange，设置默认的日期范围配置
-                      if (value === 'dateRange') {
-                        setCurrentQueryValue(
-                          JSON.stringify({
-                            type: 'daily',
-                            startOffset: -1,
-                            endOffset: 0,
-                          }),
-                        );
-                      } else {
-                        setCurrentQueryValue('');
-                      }
+          <div style={{ display: 'flex', flexDirection: 'column', position: 'relative' }}>
+            <div style={{ marginBottom: 16 }}>
+              <Row gutter={[0, 16]}>
+                <Col span={24}>
+                  <Transfer
+                    dataSource={tableItems}
+                    titles={[
+                      intl.formatMessage({ id: 'pages.backup.dataSelection.transfer.available' }),
+                      intl.formatMessage({ id: 'pages.backup.dataSelection.transfer.selected' }),
+                    ]}
+                    targetKeys={targetTableKeys}
+                    onChange={handleTableChange}
+                    filterOption={filterTableOption}
+                    showSearch
+                    oneWay
+                    render={(item) => item.title}
+                    listStyle={{
+                      width: 300,
+                      height: 300,
                     }}
-                    style={{ width: '100%' }}
-                  >
-                    <Option value="eq">=</Option>
-                    <Option value="gt">&gt;</Option>
-                    <Option value="gte">&gt;=</Option>
-                    <Option value="lt">&lt;</Option>
-                    <Option value="lte">&lt;=</Option>
-                    <Option value="ne">!=</Option>
-                    <Option value="in">in</Option>
-                    <Option value="nin">not in</Option>
-                    <Option value="dateRange">dateRange</Option>
-                  </Select>
-                </Col>
-                <Col span={8}>
-                  {currentQueryOperator !== 'dateRange' ? (
-                    <Input
-                      placeholder={intl.formatMessage({
-                        id: 'pages.backup.dataSelection.fieldValue',
-                      })}
-                      value={currentQueryValue}
-                      onChange={(e) => setCurrentQueryValue(e.target.value)}
-                    />
-                  ) : (
-                    <Select
-                      value={(() => {
-                        try {
-                          const dateConfig = JSON.parse(currentQueryValue || '{}');
-                          if (dateConfig.type === 'daily') {
-                            if (dateConfig.startOffset === -1 && dateConfig.endOffset === -1) {
-                              return 'yesterday';
-                            } else if (
-                              dateConfig.startOffset === -7 &&
-                              dateConfig.endOffset === 0
-                            ) {
-                              return 'last7days';
-                            } else if (
-                              dateConfig.startOffset === -30 &&
-                              dateConfig.endOffset === 0
-                            ) {
-                              return 'last30days';
-                            }
-                          } else if (
-                            dateConfig.type === 'weekly' &&
-                            dateConfig.startOffset === -1 &&
-                            dateConfig.endOffset === -1
-                          ) {
-                            return 'lastWeek';
-                          } else if (
-                            dateConfig.type === 'monthly' &&
-                            dateConfig.startOffset === -1 &&
-                            dateConfig.endOffset === -1
-                          ) {
-                            return 'lastMonth';
-                          }
-                          return 'custom';
-                        } catch {
-                          return 'custom';
-                        }
-                      })()}
-                      onChange={(value) => {
-                        let dateConfig;
-                        switch (value) {
-                          case 'yesterday':
-                            dateConfig = { type: 'daily', startOffset: -1, endOffset: -1 };
-                            break;
-                          case 'last7days':
-                            dateConfig = { type: 'daily', startOffset: -7, endOffset: 0 };
-                            break;
-                          case 'last30days':
-                            dateConfig = { type: 'daily', startOffset: -30, endOffset: 0 };
-                            break;
-                          case 'lastWeek':
-                            dateConfig = { type: 'weekly', startOffset: -1, endOffset: -1 };
-                            break;
-                          case 'lastMonth':
-                            dateConfig = { type: 'monthly', startOffset: -1, endOffset: -1 };
-                            break;
-                          default:
-                            dateConfig = { type: 'daily', startOffset: -1, endOffset: 0 };
-                        }
-                        setCurrentQueryValue(JSON.stringify(dateConfig));
-                      }}
-                      style={{ width: '100%' }}
-                    >
-                      <Option value="yesterday">
-                        {intl.formatMessage({ id: 'pages.backup.dateRange.yesterday' })}
-                      </Option>
-                      <Option value="last7days">
-                        {intl.formatMessage({ id: 'pages.backup.dateRange.last7days' })}
-                      </Option>
-                      <Option value="last30days">
-                        {intl.formatMessage({ id: 'pages.backup.dateRange.last30days' })}
-                      </Option>
-                      <Option value="lastWeek">
-                        {intl.formatMessage({ id: 'pages.backup.dateRange.lastWeek' })}
-                      </Option>
-                      <Option value="lastMonth">
-                        {intl.formatMessage({ id: 'pages.backup.dateRange.lastMonth' })}
-                      </Option>
-                    </Select>
-                  )}
-                </Col>
-                <Col span={3}>
-                  <Button
-                    type="primary"
-                    icon={<PlusOutlined />}
-                    onClick={handleAddQueryField}
-                    disabled={!currentQueryTable || !currentQueryField}
-                    title={
-                      !currentQueryTable
-                        ? intl.formatMessage({ id: 'pages.backup.dataSelection.selectTableFirst' })
-                        : !currentQueryField
-                          ? intl.formatMessage({ id: 'pages.backup.query.fieldRequired' })
-                          : ''
-                    }
+                    operations={[
+                      intl.formatMessage({ id: 'pages.backup.dataSelection.transfer.selectAdd' }),
+                      intl.formatMessage({
+                        id: 'pages.backup.dataSelection.transfer.selectRemove',
+                      }),
+                    ]}
                   />
                 </Col>
               </Row>
-
-              {/* 已添加的条件列表 */}
-              {queryFields.length > 0 && (
-                <List
-                  style={{ marginTop: 16 }}
-                  header={
-                    <div>{intl.formatMessage({ id: 'pages.backup.query.conditionList' })}</div>
-                  }
-                  bordered
-                  dataSource={queryFields}
-                  renderItem={(item: QueryField, index) => (
-                    <List.Item
-                      key={index}
-                      actions={[
-                        <Button
-                          key="delete"
-                          type="text"
-                          danger
-                          icon={<DeleteOutlined />}
-                          onClick={() => handleRemoveQueryField(index)}
-                        />,
-                      ]}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center' }}>
-                        <Tag color="purple">{item.table}</Tag>
-                        <Tag>{item.field}</Tag>
-                        <Tag color="blue">
-                          {item.operator === 'dateRange'
-                            ? 'dateRange'
-                            : item.operator === 'eq'
-                              ? '='
-                              : item.operator === 'gte'
-                                ? '>='
-                                : '<='}
-                        </Tag>
-                        <Tag color="green">
-                          {item.operator === 'dateRange' && item.isDateRange && item.dateRange
-                            ? (() => {
-                                const dr = item.dateRange;
-                                if (dr.type === 'daily') {
-                                  if (dr.startOffset === -1 && dr.endOffset === -1)
-                                    return intl.formatMessage({
-                                      id: 'pages.backup.dateRange.yesterday',
-                                    });
-                                  if (dr.startOffset === -7 && dr.endOffset === 0)
-                                    return intl.formatMessage({
-                                      id: 'pages.backup.dateRange.last7days',
-                                    });
-                                  if (dr.startOffset === -30 && dr.endOffset === 0)
-                                    return intl.formatMessage({
-                                      id: 'pages.backup.dateRange.last30days',
-                                    });
-                                  return intl.formatMessage(
-                                    { id: 'pages.backup.dateRange.daysFromTo' },
-                                    {
-                                      start: -dr.startOffset,
-                                      end:
-                                        dr.endOffset === 0
-                                          ? intl.formatMessage({ id: 'pages.backup.dateRange.now' })
-                                          : -dr.endOffset,
-                                    },
-                                  );
-                                } else if (dr.type === 'weekly') {
-                                  if (dr.startOffset === -1 && dr.endOffset === -1)
-                                    return intl.formatMessage({
-                                      id: 'pages.backup.dateRange.lastWeek',
-                                    });
-                                  return intl.formatMessage(
-                                    { id: 'pages.backup.dateRange.weeksFromTo' },
-                                    {
-                                      start: -dr.startOffset,
-                                      end:
-                                        dr.endOffset === 0
-                                          ? intl.formatMessage({
-                                              id: 'pages.backup.dateRange.thisWeek',
-                                            })
-                                          : -dr.endOffset,
-                                    },
-                                  );
-                                } else if (dr.type === 'monthly') {
-                                  if (dr.startOffset === -1 && dr.endOffset === -1)
-                                    return intl.formatMessage({
-                                      id: 'pages.backup.dateRange.lastMonth',
-                                    });
-                                  return intl.formatMessage(
-                                    { id: 'pages.backup.dateRange.monthsFromTo' },
-                                    {
-                                      start: -dr.startOffset,
-                                      end:
-                                        dr.endOffset === 0
-                                          ? intl.formatMessage({
-                                              id: 'pages.backup.dateRange.thisMonth',
-                                            })
-                                          : -dr.endOffset,
-                                    },
-                                  );
-                                }
-                                return item.value;
-                              })()
-                            : item.value}
-                        </Tag>
-                      </div>
-                    </List.Item>
-                  )}
-                />
-              )}
             </div>
-          </div>
 
-          <Divider />
+            {targetTableKeys.length > 0 && (
+              <div
+                style={{
+                  marginTop: 16,
+                  border: '1px solid #f0f0f0',
+                  borderRadius: '4px',
+                  padding: '16px',
+                  height: '420px',
+                  overflow: 'hidden',
+                  position: 'relative',
+                  width: '100%',
+                  minWidth: '100%',
+                  maxWidth: '100%',
+                  boxSizing: 'border-box',
+                }}
+                className="backup-config-container"
+              >
+                {/* 集合选择器 */}
+                <Row gutter={[0, 16]}>
+                  <Col span={24}>
+                    <Space align="center">
+                      <Typography.Text strong>
+                        {intl.formatMessage({ id: 'pages.backup.dataSelection.selectCollection' })}
+                      </Typography.Text>
+                      <Select
+                        style={{ width: 300 }}
+                        placeholder={intl.formatMessage({
+                          id: 'pages.backup.dataSelection.selectTable.placeholder',
+                        })}
+                        value={currentTable}
+                        onChange={(value) => {
+                          setCurrentTable(value);
+                          setCurrentQueryTable(value);
+                          handleViewTableFields(value);
+                        }}
+                        disabled={targetTableKeys.length === 0}
+                      >
+                        {targetTableKeys.map((table) => (
+                          <Select.Option key={table} value={table}>
+                            {table}
+                          </Select.Option>
+                        ))}
+                      </Select>
+                    </Space>
+                  </Col>
+                </Row>
 
-          <div className="field-selection">
-            <h4>{intl.formatMessage({ id: 'pages.backup.dataSelection.fields' })}</h4>
-            <p className="help-text">
-              {intl.formatMessage({ id: 'pages.backup.dataSelection.fields.help' })}
-            </p>
-
-            {currentTable ? (
-              <div className="field-table-container">
-                <div className="table-actions">
-                  <Button
-                    type="link"
-                    size="small"
-                    onClick={() => {
-                      if (currentTable && tableFields[currentTable]) {
-                        const allKeys = tableFields[currentTable].map((field) => field);
-                        handleFieldSelectionChange(allKeys);
-                      }
-                    }}
-                  >
-                    {intl.formatMessage({ id: 'pages.backup.dataSelection.actions.selectAll' })}
-                  </Button>
-                  <Button type="link" size="small" onClick={() => handleFieldSelectionChange([])}>
-                    {intl.formatMessage({ id: 'pages.backup.dataSelection.actions.clear' })}
-                  </Button>
-                </div>
-                <Table
-                  rowSelection={{
-                    type: 'checkbox',
-                    selectedRowKeys: jobFormData.selectedFields[currentTable] || [],
-                    onChange: handleFieldSelectionChange,
+                {/* 功能选项卡 */}
+                <Tabs
+                  defaultActiveKey="collections"
+                  style={{
+                    marginTop: 16,
+                    width: '100%',
+                    height: '350px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    minHeight: '350px',
+                    maxHeight: '350px',
                   }}
-                  columns={[
-                    {
-                      title: intl.formatMessage({ id: 'pages.backup.dataSelection.fields.name' }),
-                      dataIndex: 'name',
-                      key: 'name',
-                    },
-                    {
-                      title: intl.formatMessage({ id: 'pages.backup.dataSelection.fields.type' }),
-                      dataIndex: 'type',
-                      key: 'type',
-                    },
-                  ]}
-                  dataSource={fieldDataSource}
-                  rowKey="key"
+                  destroyInactiveTabPane={false}
+                  animated={false}
+                  tabBarStyle={{
+                    marginBottom: 0,
+                    background: '#fafafa',
+                    borderRadius: '6px 6px 0 0',
+                    padding: '4px',
+                    border: '1px solid #d9d9d9',
+                    borderBottom: 'none',
+                    flexShrink: 0,
+                  }}
+                  className="backup-tab-container"
+                  type="card"
                   size="small"
-                  pagination={false}
-                  scroll={{ y: 300 }}
-                />
+                  tabBarGutter={2}
+                  onChange={() => {
+                    // 在下一个事件循环中确保选项卡内容区域高度稳定
+                    setTimeout(() => {
+                      const contentWrappers = document.querySelectorAll('.tab-content-wrapper');
+                      contentWrappers.forEach((wrapper) => {
+                        if (wrapper) {
+                          (wrapper as HTMLElement).style.height = '300px';
+                          (wrapper as HTMLElement).style.minHeight = '300px';
+                          (wrapper as HTMLElement).style.maxHeight = '300px';
+                        }
+                      });
+                    }, 0);
+                  }}
+                >
+                  {/* 集合选择选项卡 */}
+                  <Tabs.TabPane
+                    tab={
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          padding: '2px 6px',
+                          fontWeight: 500,
+                          fontSize: '12px',
+                        }}
+                      >
+                        <DatabaseOutlined style={{ fontSize: '12px' }} />
+                        <span>
+                          {intl.formatMessage({ id: 'pages.backup.dataSelection.collections' })}
+                        </span>
+                      </div>
+                    }
+                    key="collections"
+                    forceRender
+                  >
+                    <div
+                      className="tab-content-wrapper"
+                      style={{
+                        height: '300px',
+                        minHeight: '300px',
+                        maxHeight: '300px',
+                        overflowY: 'auto',
+                        background: '#fff',
+                        border: '1px solid #d9d9d9',
+                        borderTop: 'none',
+                        padding: '16px',
+                        position: 'relative',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        boxSizing: 'border-box',
+                      }}
+                    >
+                      <div style={{ marginBottom: '12px' }}>
+                        <Typography.Text type="secondary" style={{ fontSize: '14px' }}>
+                          {intl.formatMessage({
+                            id: 'pages.backup.dataSelection.collections.help',
+                          })}
+                        </Typography.Text>
+                      </div>
+                      <Table
+                        dataSource={targetTableKeys.map((tableName) => ({
+                          key: tableName,
+                          tableName,
+                          fieldCount: tableFields[tableName]?.length || 0,
+                          selectedFieldCount: jobFormData.selectedFields[tableName]?.length || 0,
+                          queryCount: queryFields.filter((q) => q.table === tableName).length,
+                        }))}
+                        columns={[
+                          {
+                            title: intl.formatMessage({
+                              id: 'pages.backup.dataSelection.collections.name',
+                            }),
+                            dataIndex: 'tableName',
+                            key: 'tableName',
+                          },
+                          {
+                            title: intl.formatMessage({
+                              id: 'pages.backup.dataSelection.collections.fields',
+                            }),
+                            dataIndex: 'fieldCount',
+                            key: 'fieldCount',
+                            render: (count, record) => (
+                              <Space>
+                                <Badge
+                                  count={record.selectedFieldCount}
+                                  style={{ backgroundColor: '#52c41a' }}
+                                />
+                                <Typography.Text type="secondary">/ {count}</Typography.Text>
+                              </Space>
+                            ),
+                          },
+                          {
+                            title: intl.formatMessage({
+                              id: 'pages.backup.dataSelection.collections.queries',
+                            }),
+                            dataIndex: 'queryCount',
+                            key: 'queryCount',
+                            render: (count) => (
+                              <Badge
+                                count={count}
+                                style={{ backgroundColor: count > 0 ? '#1890ff' : '#d9d9d9' }}
+                              />
+                            ),
+                          },
+                        ]}
+                        pagination={false}
+                        size="small"
+                        rowClassName={(record) =>
+                          record.tableName === currentTable ? 'ant-table-row-selected' : ''
+                        }
+                        onRow={(record) => ({
+                          onClick: () => {
+                            setCurrentTable(record.tableName);
+                            setCurrentQueryTable(record.tableName);
+                            handleViewTableFields(record.tableName);
+                          },
+                          style: { cursor: 'pointer' },
+                        })}
+                      />
+                    </div>
+                  </Tabs.TabPane>
+
+                  {/* 查询条件选项卡 */}
+                  <Tabs.TabPane
+                    tab={
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          padding: '2px 6px',
+                          fontWeight: 500,
+                          fontSize: '12px',
+                        }}
+                      >
+                        <FilterOutlined style={{ fontSize: '12px' }} />
+                        <span>
+                          {intl.formatMessage({ id: 'pages.backup.dataSelection.queryBuilder' })}
+                        </span>
+                      </div>
+                    }
+                    key="query"
+                    disabled={!currentTable}
+                    forceRender
+                  >
+                    <div
+                      className="tab-content-wrapper"
+                      style={{
+                        height: '300px',
+                        minHeight: '300px',
+                        maxHeight: '300px',
+                        overflowY: 'auto',
+                        background: '#fff',
+                        border: '1px solid #d9d9d9',
+                        borderTop: 'none',
+                        padding: '16px',
+                        position: 'relative',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        boxSizing: 'border-box',
+                      }}
+                    >
+                      {currentTable ? (
+                        <>
+                          <div style={{ marginBottom: '12px' }}>
+                            <Typography.Text type="secondary" style={{ fontSize: '14px' }}>
+                              {intl.formatMessage({
+                                id: 'pages.backup.dataSelection.queryBuilder.help',
+                              })}
+                            </Typography.Text>
+                          </div>
+
+                          {/* 添加新查询条件 */}
+                          <div style={{ marginBottom: 16 }}>
+                            <Typography.Title
+                              level={5}
+                              style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '12px' }}
+                            >
+                              {intl.formatMessage({
+                                id: 'pages.backup.dataSelection.addQueryField',
+                              })}
+                            </Typography.Title>
+
+                            <Row gutter={8} align="middle">
+                              <Col span={8}>
+                                <Input
+                                  placeholder={intl.formatMessage({
+                                    id: 'pages.backup.dataSelection.fieldName',
+                                  })}
+                                  value={currentQueryField}
+                                  onChange={(e) => setCurrentQueryField(e.target.value)}
+                                  autoComplete="off"
+                                />
+                              </Col>
+                              <Col span={6}>
+                                <Select
+                                  value={currentQueryOperator}
+                                  onChange={(value) => {
+                                    setCurrentQueryOperator(value);
+                                    if (value === 'dateRange') {
+                                      setCurrentQueryValue(
+                                        JSON.stringify({
+                                          type: 'daily',
+                                          startOffset: -1,
+                                          endOffset: 0,
+                                        }),
+                                      );
+                                    } else {
+                                      setCurrentQueryValue('');
+                                    }
+                                  }}
+                                  style={{ width: '100%' }}
+                                >
+                                  <Select.Option value="eq">=</Select.Option>
+                                  <Select.Option value="gt">&gt;</Select.Option>
+                                  <Select.Option value="gte">&gt;=</Select.Option>
+                                  <Select.Option value="lt">&lt;</Select.Option>
+                                  <Select.Option value="lte">&lt;=</Select.Option>
+                                  <Select.Option value="ne">!=</Select.Option>
+                                  <Select.Option value="in">in</Select.Option>
+                                  <Select.Option value="nin">not in</Select.Option>
+                                  <Select.Option value="dateRange">dateRange</Select.Option>
+                                </Select>
+                              </Col>
+                              <Col span={8}>
+                                {currentQueryOperator !== 'dateRange' ? (
+                                  <Input
+                                    placeholder={intl.formatMessage({
+                                      id: 'pages.backup.dataSelection.fieldValue',
+                                    })}
+                                    value={currentQueryValue}
+                                    onChange={(e) => setCurrentQueryValue(e.target.value)}
+                                    autoComplete="off"
+                                  />
+                                ) : (
+                                  <Select
+                                    value={(() => {
+                                      try {
+                                        const dateConfig = JSON.parse(currentQueryValue || '{}');
+                                        if (dateConfig.type === 'daily') {
+                                          if (
+                                            dateConfig.startOffset === -1 &&
+                                            dateConfig.endOffset === -1
+                                          ) {
+                                            return 'yesterday';
+                                          }
+                                        }
+                                        return 'yesterday';
+                                      } catch {
+                                        return 'yesterday';
+                                      }
+                                    })()}
+                                    onChange={(value) => {
+                                      let dateConfig;
+                                      switch (value) {
+                                        case 'yesterday':
+                                          dateConfig = {
+                                            type: 'daily',
+                                            startOffset: -1,
+                                            endOffset: -1,
+                                          };
+                                          break;
+                                        case 'last7days':
+                                          dateConfig = {
+                                            type: 'daily',
+                                            startOffset: -7,
+                                            endOffset: 0,
+                                          };
+                                          break;
+                                        case 'last30days':
+                                          dateConfig = {
+                                            type: 'daily',
+                                            startOffset: -30,
+                                            endOffset: 0,
+                                          };
+                                          break;
+                                        default:
+                                          dateConfig = {
+                                            type: 'daily',
+                                            startOffset: -1,
+                                            endOffset: 0,
+                                          };
+                                      }
+                                      setCurrentQueryValue(JSON.stringify(dateConfig));
+                                    }}
+                                    style={{ width: '100%' }}
+                                  >
+                                    <Select.Option value="yesterday">
+                                      {intl.formatMessage({
+                                        id: 'pages.backup.dateRange.yesterday',
+                                      })}
+                                    </Select.Option>
+                                    <Select.Option value="last7days">
+                                      {intl.formatMessage({
+                                        id: 'pages.backup.dateRange.last7days',
+                                      })}
+                                    </Select.Option>
+                                    <Select.Option value="last30days">
+                                      {intl.formatMessage({
+                                        id: 'pages.backup.dateRange.last30days',
+                                      })}
+                                    </Select.Option>
+                                  </Select>
+                                )}
+                              </Col>
+                              <Col span={2}>
+                                <Button
+                                  type="primary"
+                                  icon={<PlusOutlined />}
+                                  onClick={handleAddQueryField}
+                                  disabled={!currentQueryTable || !currentQueryField}
+                                />
+                              </Col>
+                            </Row>
+                          </div>
+
+                          {/* 查询条件列表 */}
+                          <div style={{ marginTop: 20 }}>
+                            <Typography.Title
+                              level={5}
+                              style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '12px' }}
+                            >
+                              {intl.formatMessage({ id: 'pages.backup.query.conditionList' })}
+                            </Typography.Title>
+                            {queryFields.filter((q) => q.table === currentTable).length === 0 ? (
+                              <div style={{ textAlign: 'center', padding: '16px', color: '#999' }}>
+                                {intl.formatMessage({ id: 'pages.backup.query.noConditions' })}
+                              </div>
+                            ) : (
+                              <List
+                                bordered
+                                dataSource={queryFields.filter((q) => q.table === currentTable)}
+                                renderItem={(item: QueryField, index) => (
+                                  <List.Item
+                                    key={index}
+                                    actions={[
+                                      <Button
+                                        key="delete"
+                                        type="text"
+                                        danger
+                                        icon={<DeleteOutlined />}
+                                        onClick={() => {
+                                          const globalIndex = queryFields.findIndex(
+                                            (q) =>
+                                              q.table === item.table &&
+                                              q.field === item.field &&
+                                              q.operator === item.operator &&
+                                              q.value === item.value,
+                                          );
+                                          handleRemoveQueryField(globalIndex);
+                                        }}
+                                      />,
+                                    ]}
+                                  >
+                                    <div
+                                      style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+                                    >
+                                      <Tag color="purple">{item.table}</Tag>
+                                      <Tag>{item.field}</Tag>
+                                      <Tag color="blue">{item.operator}</Tag>
+                                      <Tag color="green">{item.value}</Tag>
+                                    </div>
+                                  </List.Item>
+                                )}
+                              />
+                            )}
+                          </div>
+                        </>
+                      ) : (
+                        <div style={{ textAlign: 'center', padding: '50px 20px' }}>
+                          <Empty
+                            description={intl.formatMessage({
+                              id: 'pages.backup.dataSelection.selectTableFirst',
+                            })}
+                            image={Empty.PRESENTED_IMAGE_SIMPLE}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </Tabs.TabPane>
+
+                  {/* 字段选择选项卡 */}
+                  <Tabs.TabPane
+                    tab={
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          padding: '2px 6px',
+                          fontWeight: 500,
+                          fontSize: '12px',
+                        }}
+                      >
+                        <TableOutlined style={{ fontSize: '12px' }} />
+                        <span>
+                          {intl.formatMessage({ id: 'pages.backup.dataSelection.fields' })}
+                        </span>
+                      </div>
+                    }
+                    key="fields"
+                    disabled={!currentTable}
+                    forceRender
+                  >
+                    <div
+                      className="tab-content-wrapper"
+                      style={{
+                        height: '300px',
+                        minHeight: '300px',
+                        maxHeight: '300px',
+                        overflowY: 'auto',
+                        background: '#fff',
+                        border: '1px solid #d9d9d9',
+                        borderTop: 'none',
+                        padding: '16px',
+                        position: 'relative',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        boxSizing: 'border-box',
+                      }}
+                    >
+                      {currentTable ? (
+                        <>
+                          <div style={{ marginBottom: '12px' }}>
+                            <Typography.Text type="secondary" style={{ fontSize: '14px' }}>
+                              {intl.formatMessage({ id: 'pages.backup.dataSelection.fields.help' })}
+                            </Typography.Text>
+                          </div>
+
+                          <div className="table-actions" style={{ marginBottom: '12px' }}>
+                            <Button
+                              type="link"
+                              size="small"
+                              onClick={() => {
+                                if (currentTable && tableFields[currentTable]) {
+                                  const allKeys = tableFields[currentTable].map((field) => field);
+                                  handleFieldSelectionChange(allKeys);
+                                }
+                              }}
+                            >
+                              {intl.formatMessage({
+                                id: 'pages.backup.dataSelection.actions.selectAll',
+                              })}
+                            </Button>
+                            <Button
+                              type="link"
+                              size="small"
+                              onClick={() => handleFieldSelectionChange([])}
+                            >
+                              {intl.formatMessage({
+                                id: 'pages.backup.dataSelection.actions.clear',
+                              })}
+                            </Button>
+                          </div>
+
+                          <Table
+                            rowSelection={{
+                              type: 'checkbox',
+                              selectedRowKeys: jobFormData.selectedFields[currentTable] || [],
+                              onChange: handleFieldSelectionChange,
+                            }}
+                            columns={[
+                              {
+                                title: intl.formatMessage({
+                                  id: 'pages.backup.dataSelection.fields.name',
+                                }),
+                                dataIndex: 'name',
+                                key: 'name',
+                              },
+                              {
+                                title: intl.formatMessage({
+                                  id: 'pages.backup.dataSelection.fields.type',
+                                }),
+                                dataIndex: 'type',
+                                key: 'type',
+                              },
+                            ]}
+                            dataSource={fieldDataSource}
+                            rowKey="key"
+                            size="small"
+                            pagination={false}
+                            className="backup-field-table"
+                          />
+                        </>
+                      ) : (
+                        <div style={{ textAlign: 'center', padding: '50px 20px' }}>
+                          <Empty
+                            description={intl.formatMessage({
+                              id: 'pages.backup.dataSelection.selectTableFirst',
+                            })}
+                            image={Empty.PRESENTED_IMAGE_SIMPLE}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </Tabs.TabPane>
+
+                  {/* 目标位置选项卡 */}
+                  <Tabs.TabPane
+                    tab={
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          padding: '2px 6px',
+                          fontWeight: 500,
+                          fontSize: '12px',
+                        }}
+                      >
+                        <CloudServerOutlined style={{ fontSize: '12px' }} />
+                        <span>{intl.formatMessage({ id: 'pages.backup.tabs.destination' })}</span>
+                      </div>
+                    }
+                    key="destination"
+                    forceRender
+                  >
+                    <div
+                      className="tab-content-wrapper"
+                      style={{
+                        height: '300px',
+                        minHeight: '300px',
+                        maxHeight: '300px',
+                        overflowY: 'auto',
+                        background: '#fff',
+                        border: '1px solid #d9d9d9',
+                        borderTop: 'none',
+                        padding: '16px',
+                        position: 'relative',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        boxSizing: 'border-box',
+                      }}
+                    >
+                      <div style={{ marginBottom: '12px' }}>
+                        <Typography.Text type="secondary" style={{ fontSize: '14px' }}>
+                          {intl.formatMessage({ id: 'pages.backup.destination.help' }) ||
+                            'Configure Google Cloud Storage settings for backup files'}
+                        </Typography.Text>
+                      </div>
+                      <Form.Item
+                        name="gcsPath"
+                        label={intl.formatMessage({ id: 'pages.backup.form.gcsPath' })}
+                        rules={[
+                          {
+                            required: true,
+                            message: intl.formatMessage({
+                              id: 'pages.backup.form.gcsPath.required',
+                            }),
+                          },
+                        ]}
+                        tooltip={intl.formatMessage({ id: 'pages.backup.form.gcsPath.tooltip' })}
+                      >
+                        <Input
+                          placeholder={intl.formatMessage({
+                            id: 'pages.backup.form.gcsPath.placeholder',
+                          })}
+                        />
+                      </Form.Item>
+
+                      <Form.Item
+                        name="fileNamePattern"
+                        label={intl.formatMessage({ id: 'pages.backup.form.fileNamePattern' })}
+                        rules={[
+                          {
+                            required: true,
+                            message: intl.formatMessage({
+                              id: 'pages.backup.form.fileNamePattern.required',
+                            }),
+                          },
+                          {
+                            validator: (_, value) => {
+                              if (!value) return Promise.resolve();
+                              try {
+                                new RegExp(value);
+                                return Promise.resolve();
+                              } catch (error) {
+                                return Promise.reject(
+                                  new Error(
+                                    intl.formatMessage({
+                                      id: 'pages.backup.form.fileNamePattern.invalid',
+                                    }),
+                                  ),
+                                );
+                              }
+                            },
+                          },
+                        ]}
+                        tooltip={intl.formatMessage({
+                          id: 'pages.backup.form.fileNamePattern.tooltip',
+                        })}
+                      >
+                        <Input
+                          placeholder={intl.formatMessage({
+                            id: 'pages.backup.form.fileNamePattern.placeholder',
+                          })}
+                          onMouseEnter={(e) => {
+                            // 当鼠标悬停时显示正则表达式匹配示例
+                            const pattern = e.target.value;
+                            if (pattern) {
+                              try {
+                                const regex = new RegExp(pattern);
+                                const examples = [
+                                  'backup_2024-01-15_user_data.json',
+                                  'backup_2024-01-15_product_catalog.json',
+                                  'backup_2024-01-15_order_history.json',
+                                  'sync_2024-01-15_logs.csv',
+                                  'export_2024-01-15_analytics.bson',
+                                ];
+                                const matches = examples.filter((example) => regex.test(example));
+                                if (matches.length > 0) {
+                                  console.log('匹配的文件名示例:', matches);
+                                }
+                              } catch (error) {
+                                console.log('正则表达式无效');
+                              }
+                            }
+                          }}
+                        />
+                      </Form.Item>
+                    </div>
+                  </Tabs.TabPane>
+                </Tabs>
               </div>
-            ) : (
-              <Empty
-                description={
-                  targetTableKeys.length === 0
-                    ? intl.formatMessage({ id: 'pages.backup.dataSelection.selectFirst' })
-                    : intl.formatMessage({ id: 'pages.backup.dataSelection.selectToView' })
-                }
-              />
             )}
           </div>
-        </StepsForm.StepForm>
-
-        {/* 步骤3：目标位置 */}
-        <StepsForm.StepForm
-          name="destination"
-          title={intl.formatMessage({ id: 'pages.backup.tabs.destination' })}
-          initialValues={
-            editingJobId
-              ? {
-                  gcsPath: jobFormData.gcsPath,
-                  serviceAccount: jobFormData.serviceAccount,
-                  retention: jobFormData.retention,
-                }
-              : {
-                  gcsPath: '',
-                  serviceAccount: '',
-                  retention: 30,
-                }
-          }
-        >
-          <Form.Item
-            name="gcsPath"
-            label={intl.formatMessage({ id: 'pages.backup.form.gcsPath' })}
-            rules={[
-              {
-                required: true,
-                message: intl.formatMessage({ id: 'pages.backup.form.gcsPath.required' }),
-              },
-            ]}
-            tooltip={intl.formatMessage({ id: 'pages.backup.form.gcsPath.tooltip' })}
-          >
-            <Input
-              placeholder={intl.formatMessage({ id: 'pages.backup.form.gcsPath.placeholder' })}
-            />
-          </Form.Item>
-
-          <Form.Item
-            name="serviceAccount"
-            label={intl.formatMessage({ id: 'pages.backup.form.serviceAccount' })}
-            rules={[
-              {
-                required: true,
-                message: intl.formatMessage({ id: 'pages.backup.form.serviceAccount.required' }),
-              },
-            ]}
-            tooltip={intl.formatMessage({ id: 'pages.backup.form.serviceAccount.tooltip' })}
-          >
-            <Input
-              placeholder={intl.formatMessage({
-                id: 'pages.backup.form.serviceAccount.placeholder',
-              })}
-            />
-          </Form.Item>
-
-          <Form.Item
-            name="retention"
-            label={intl.formatMessage({ id: 'pages.backup.form.retention' })}
-            rules={[
-              {
-                required: true,
-                message: intl.formatMessage({ id: 'pages.backup.form.retention.required' }),
-              },
-            ]}
-            tooltip={intl.formatMessage({ id: 'pages.backup.form.retention.tooltip' })}
-          >
-            <InputNumber min={1} max={365} />
-          </Form.Item>
         </StepsForm.StepForm>
       </StepsForm>
     </div>

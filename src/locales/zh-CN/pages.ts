@@ -341,4 +341,12 @@ export default {
   'pages.sqlDebug.target': 'Target',
   'pages.sqlDebug.redisNotSupported':
     'Redis data source does not support SQL operations, please use Redis commands',
+
+  // Backup related internationalization
+  'pages.backup.form.fileNamePattern': '文件名模式（正则表达式）',
+  'pages.backup.form.fileNamePattern.required': '请输入文件名模式',
+  'pages.backup.form.fileNamePattern.placeholder': '例如：^backup_\\d{4}-\\d{2}-\\d{2}_.*\\.json$',
+  'pages.backup.form.fileNamePattern.invalid': '无效的正则表达式',
+  'pages.backup.form.fileNamePattern.tooltip':
+    '用于匹配备份文件名的正则表达式模式。鼠标悬停可查看匹配示例。',
 };

@@ -22,6 +22,7 @@ import {
   Tabs,
   Badge,
   Empty,
+  Tooltip,
 } from 'antd';
 import {
   LockOutlined,
@@ -32,6 +33,7 @@ import {
   SecurityScanOutlined,
   SettingOutlined,
   TableOutlined,
+  InfoCircleOutlined,
 } from '@ant-design/icons';
 import type { TransferDirection } from 'antd/es/transfer';
 import type { FormInstance } from 'antd';
@@ -63,6 +65,8 @@ interface TableItem {
   advancedSettings?: {
     syncIndexes?: boolean;
     ignoreDeleteOps?: boolean;
+    uploadToGcs?: boolean;
+    gcsAddress?: string;
   };
 }
 
@@ -169,7 +173,10 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
   const [currentQueryOperator, setCurrentQueryOperator] = useState<string>('=');
   const [currentQueryValue, setCurrentQueryValue] = useState<string>('');
   const [tableAdvancedSettings, setTableAdvancedSettings] = useState<
-    Record<string, { syncIndexes: boolean; ignoreDeleteOps: boolean }>
+    Record<
+      string,
+      { syncIndexes: boolean; ignoreDeleteOps: boolean; uploadToGcs: boolean; gcsAddress: string }
+    >
   >({});
 
   const intl = useIntl();
@@ -361,6 +368,8 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
             newSettings[tableName] = {
               syncIndexes: false,
               ignoreDeleteOps: false,
+              uploadToGcs: false,
+              gcsAddress: '',
             };
           }
         });
@@ -443,6 +452,8 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
             advancedSettings: {
               syncIndexes: tableAdvancedSettings[tableName]?.syncIndexes ?? false,
               ignoreDeleteOps: tableAdvancedSettings[tableName]?.ignoreDeleteOps ?? false,
+              uploadToGcs: tableAdvancedSettings[tableName]?.uploadToGcs ?? false,
+              gcsAddress: tableAdvancedSettings[tableName]?.gcsAddress ?? '',
             },
           };
 
@@ -988,7 +999,12 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
         const newTablesSecurityOptions: Record<string, Record<string, FieldOption>> = {};
         const newTableAdvancedSettings: Record<
           string,
-          { syncIndexes: boolean; ignoreDeleteOps: boolean }
+          {
+            syncIndexes: boolean;
+            ignoreDeleteOps: boolean;
+            uploadToGcs: boolean;
+            gcsAddress: string;
+          }
         > = {};
 
         record.mappings[0].tables.forEach((table) => {
@@ -996,6 +1012,8 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
           newTableAdvancedSettings[table.sourceTable] = {
             syncIndexes: table.advancedSettings?.syncIndexes ?? false,
             ignoreDeleteOps: table.advancedSettings?.ignoreDeleteOps ?? false,
+            uploadToGcs: table.advancedSettings?.uploadToGcs ?? false,
+            gcsAddress: table.advancedSettings?.gcsAddress ?? '',
           };
 
           if (table.fieldSecurity && table.fieldSecurity.length > 0) {
@@ -1240,7 +1258,14 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
                 return (
                   <ProFormText
                     name="mongodb_resume_token_path"
-                    label="MongoDB Resume Token Path"
+                    label={
+                      <span>
+                        MongoDB Checkpoint Path{' '}
+                        <Tooltip title="Specifies the file path for storing MongoDB checkpoint logs and position data. This path is used to track the resume token for change stream operations, ensuring data consistency during synchronization restarts.">
+                          <InfoCircleOutlined style={{ color: '#1890ff' }} />
+                        </Tooltip>
+                      </span>
+                    }
                     fieldProps={{ autoComplete: 'off' }}
                   />
                 );
@@ -2046,7 +2071,12 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
                                   setTableAdvancedSettings((prev) => ({
                                     ...prev,
                                     [currentQueryTable]: {
-                                      ...(prev[currentQueryTable] || { ignoreDeleteOps: false }),
+                                      ...(prev[currentQueryTable] || {
+                                        syncIndexes: false,
+                                        ignoreDeleteOps: false,
+                                        uploadToGcs: false,
+                                        gcsAddress: '',
+                                      }),
                                       syncIndexes: checked,
                                     },
                                   }));
@@ -2056,7 +2086,7 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
                           </Row>
 
                           {/* Setting 2: Ignore Delete Operations */}
-                          <Row align="middle">
+                          <Row align="middle" style={{ marginBottom: '16px' }}>
                             <Col span={18}>
                               <div>
                                 <Typography.Text strong>
@@ -2084,7 +2114,12 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
                                   setTableAdvancedSettings((prev) => ({
                                     ...prev,
                                     [currentQueryTable]: {
-                                      ...(prev[currentQueryTable] || { syncIndexes: false }),
+                                      ...(prev[currentQueryTable] || {
+                                        syncIndexes: false,
+                                        ignoreDeleteOps: false,
+                                        uploadToGcs: false,
+                                        gcsAddress: '',
+                                      }),
                                       ignoreDeleteOps: checked,
                                     },
                                   }));
@@ -2092,6 +2127,87 @@ const AddSync: React.FC<AddSyncProps> = ({ record, onSuccess, onCancel }) => {
                               />
                             </Col>
                           </Row>
+
+                          {/* Setting 3: Upload to GCS */}
+                          <Row align="middle" style={{ marginBottom: '16px' }}>
+                            <Col span={18}>
+                              <div>
+                                <Typography.Text strong>
+                                  {intl.formatMessage(
+                                    { id: 'pages.sync.uploadToGcs' },
+                                    { defaultMessage: 'Upload to Google Cloud Storage' },
+                                  )}
+                                </Typography.Text>
+                                <div>
+                                  <Typography.Text type="secondary" style={{ fontSize: '12px' }}>
+                                    {intl.formatMessage(
+                                      { id: 'pages.sync.uploadToGcsDesc' },
+                                      { defaultMessage: '将changestream数据上传到Google云存储' },
+                                    )}
+                                  </Typography.Text>
+                                </div>
+                              </div>
+                            </Col>
+                            <Col span={6} style={{ textAlign: 'right' }}>
+                              <Switch
+                                checked={
+                                  tableAdvancedSettings[currentQueryTable]?.uploadToGcs ?? false
+                                }
+                                onChange={(checked) => {
+                                  setTableAdvancedSettings((prev) => ({
+                                    ...prev,
+                                    [currentQueryTable]: {
+                                      ...(prev[currentQueryTable] || {
+                                        syncIndexes: false,
+                                        ignoreDeleteOps: false,
+                                        uploadToGcs: false,
+                                        gcsAddress: '',
+                                      }),
+                                      uploadToGcs: checked,
+                                    },
+                                  }));
+                                }}
+                              />
+                            </Col>
+                          </Row>
+
+                          {/* GCS Address Input - only show when upload is enabled */}
+                          {(tableAdvancedSettings[currentQueryTable]?.uploadToGcs ?? false) && (
+                            <Row style={{ marginBottom: '16px' }}>
+                              <Col span={24}>
+                                <div style={{ marginBottom: '8px' }}>
+                                  <Typography.Text strong>
+                                    {intl.formatMessage(
+                                      { id: 'pages.sync.gcsAddress' },
+                                      { defaultMessage: 'GCS Address' },
+                                    )}
+                                  </Typography.Text>
+                                </div>
+                                <Input
+                                  placeholder={intl.formatMessage(
+                                    { id: 'pages.sync.gcsAddressPlaceholder' },
+                                    { defaultMessage: '例如: gs://bucket-name/path/' },
+                                  )}
+                                  value={tableAdvancedSettings[currentQueryTable]?.gcsAddress ?? ''}
+                                  onChange={(e) => {
+                                    setTableAdvancedSettings((prev) => ({
+                                      ...prev,
+                                      [currentQueryTable]: {
+                                        ...(prev[currentQueryTable] || {
+                                          syncIndexes: false,
+                                          ignoreDeleteOps: false,
+                                          uploadToGcs: false,
+                                          gcsAddress: '',
+                                        }),
+                                        gcsAddress: e.target.value,
+                                      },
+                                    }));
+                                  }}
+                                  autoComplete="off"
+                                />
+                              </Col>
+                            </Row>
+                          )}
                         </div>
                       </>
                     ) : (

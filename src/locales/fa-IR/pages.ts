@@ -66,4 +66,12 @@ export default {
   'pages.searchTable.tenThousand': '0000',
   'pages.searchTable.batchDeletion': 'حذف دسته ای',
   'pages.searchTable.batchApproval': 'تصویب دسته ای',
+
+  // Backup related internationalization
+  'pages.backup.form.fileNamePattern': 'الگوی نام فایل (Regex)',
+  'pages.backup.form.fileNamePattern.required': 'لطفاً الگوی نام فایل را وارد کنید',
+  'pages.backup.form.fileNamePattern.placeholder': 'مثال: ^backup_\\d{4}-\\d{2}-\\d{2}_.*\\.json$',
+  'pages.backup.form.fileNamePattern.invalid': 'عبارت منظم نامعتبر',
+  'pages.backup.form.fileNamePattern.tooltip':
+    'الگوی عبارت منظم برای تطبیق نام‌های فایل‌های پشتیبان. برای مشاهده نمونه‌های تطبیق، ماوس را نگه دارید.',
 };

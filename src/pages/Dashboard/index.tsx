@@ -629,7 +629,16 @@ const Dashboard: React.FC = () => {
 
       {/* Active ChangeStreams */}
       <Card
-        title={intl.formatMessage({ id: 'pages.dashboard.activeChangeStreams' })}
+        title={
+          <div>
+            {intl.formatMessage({ id: 'pages.dashboard.activeChangeStreams' })}
+            <Tooltip title="Data refreshes automatically every 10 minutes">
+              <span style={{ display: 'inline-block' }}>
+                <InfoCircleOutlined style={{ marginLeft: 8, color: '#999' }} />
+              </span>
+            </Tooltip>
+          </div>
+        }
         className={styles.sectionCard}
       >
         <div>
@@ -678,7 +687,16 @@ const Dashboard: React.FC = () => {
 
       {/* 表行数趋势图 */}
       <Card
-        title={intl.formatMessage({ id: 'pages.dashboard.tableRowCountTrend' })}
+        title={
+          <div>
+            {intl.formatMessage({ id: 'pages.dashboard.tableRowCountTrend' })}
+            <Tooltip title="Data refreshes automatically every 10 minutes">
+              <span style={{ display: 'inline-block' }}>
+                <InfoCircleOutlined style={{ marginLeft: 8, color: '#999' }} />
+              </span>
+            </Tooltip>
+          </div>
+        }
         className={styles.sectionCard}
       >
         <div className={styles.chartControls}>

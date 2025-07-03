@@ -1,5 +1,179 @@
 // @import '~antd/es/style/themes/default.less';
 
+// Tab布局稳定性样式
+.backup-tab-container {
+  .ant-tabs-content-holder {
+    overflow: hidden;
+    position: relative;
+    flex: 1;
+
+    .ant-tabs-content {
+      height: 100%;
+      overflow: hidden;
+
+      .ant-tabs-tabpane {
+        height: 100%;
+        overflow: hidden;
+
+        .tab-content-wrapper {
+          // 确保所有Tab内容区域有相同的尺寸
+          height: 300px !important;
+          min-height: 300px !important;
+          max-height: 300px !important;
+          overflow-y: auto !important;
+          overflow-x: hidden !important;
+
+          // 防止滚动条影响布局
+          &::-webkit-scrollbar {
+            width: 8px;
+          }
+
+          &::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+          }
+
+          &::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 4px;
+
+            &:hover {
+              background: #a8a8a8;
+            }
+          }
+        }
+
+        // Field Selection选项卡特殊处理
+        &[data-node-key='fields'] {
+          .table-actions {
+            flex-shrink: 0;
+            margin-bottom: 12px !important;
+          }
+
+          .ant-table-wrapper {
+            flex: 1;
+            height: auto;
+            overflow: visible;
+
+            .ant-table {
+              .ant-table-container {
+                height: auto;
+
+                .ant-table-header {
+                  flex-shrink: 0;
+                }
+
+                .ant-table-body {
+                  height: auto;
+                  max-height: none;
+                  overflow: visible;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  .ant-tabs-tab {
+    // 确保Tab按钮尺寸稳定
+    min-width: 100px;
+    text-align: center;
+
+    .ant-tabs-tab-btn {
+      width: 100%;
+      justify-content: center;
+    }
+  }
+
+  // 为Tab内容中的Table组件添加特殊控制
+  .tab-content-wrapper {
+    .table-actions {
+      flex-shrink: 0;
+      margin-bottom: 12px !important;
+    }
+
+    .ant-table-wrapper {
+      flex: 1;
+      height: auto;
+      overflow: visible;
+
+      .ant-table {
+        .ant-table-container {
+          height: auto;
+
+          .ant-table-header {
+            flex-shrink: 0;
+          }
+
+          .ant-table-body {
+            height: auto;
+            max-height: none;
+            overflow: visible;
+          }
+        }
+      }
+    }
+  }
+}
+
+// Field Selection专用Table样式
+.backup-field-table {
+  &.ant-table-wrapper {
+    height: auto !important;
+
+    .ant-table {
+      .ant-table-container {
+        .ant-table-header {
+          position: sticky;
+          top: 0;
+          z-index: 1;
+          background: #fff;
+        }
+
+        .ant-table-body {
+          height: auto !important;
+          max-height: none !important;
+          overflow: visible !important;
+        }
+
+        .ant-table-tbody {
+          .ant-table-row {
+            // 确保表格行高度一致
+            height: auto;
+
+            .ant-table-cell {
+              padding: 8px 16px;
+              white-space: nowrap;
+              overflow: hidden;
+              text-overflow: ellipsis;
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+// 主容器稳定性样式
+.backup-config-container {
+  // 确保容器尺寸稳定
+  width: 100% !important;
+  min-width: 100% !important;
+  max-width: 100% !important;
+  height: 420px !important;
+  min-height: 420px !important;
+  max-height: 420px !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+
+  // 防止内容溢出
+  * {
+    box-sizing: border-box;
+  }
+}
+
 // .backup-container {
 //   padding: 20px;
 // }

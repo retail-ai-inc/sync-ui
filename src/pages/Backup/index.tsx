@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { flushSync } from 'react-dom';
 import {
   Card,
   Button,
@@ -73,6 +74,7 @@ interface BackupJob {
   destination: {
     gcsPath: string;
     fileNamePattern: string; // 改为文件名正则表达式
+    retention?: number; // 文件保留天数
   };
   schedule: string; // Cron 表达式
   lastExecution: {
@@ -104,6 +106,7 @@ interface JobFormData {
   };
   gcsPath: string;
   fileNamePattern: string; // 改为文件名正则表达式
+  retention?: number; // 新增：文件保留天数
   cronExpression: string;
   fileType: 'json' | 'bson' | 'csv';
   backupType: 'full' | 'incremental'; // 新增：备份类型
@@ -213,6 +216,9 @@ const JobList: React.FC = () => {
     'nextRun',
     'action',
   ]);
+
+  // 跟踪正在运行的任务
+  const [runningTasks, setRunningTasks] = useState<Set<string>>(new Set());
 
   // 添加搜索输入框引用
   const searchInputRef = useRef<any>(null);
@@ -465,6 +471,9 @@ const JobList: React.FC = () => {
 
         setJobs(mappedData);
         setFilteredJobs(mappedData);
+
+        // 清理运行状态标记，因为我们获取到了最新的实际状态
+        setRunningTasks(new Set());
 
         console.log('获取到的任务数据:', mappedData);
         if (mappedData.length > 0) {
@@ -1224,6 +1233,87 @@ const JobList: React.FC = () => {
 
   // 立即运行任务
   const runJobNow = async (jobId: string) => {
+    // 保存原始状态，以便在失败时恢复
+    const originalJob = jobs.find((j) => j.id === jobId);
+    if (!originalJob) {
+      message.error('未找到对应的任务');
+      return;
+    }
+
+    // 检查任务是否已经在运行中（避免重复执行）
+    if (runningTasks.has(jobId)) {
+      console.log('任务已在运行中，跳过重复执行');
+      return;
+    }
+
+    // 确保任务在运行集合中，并更新任务状态
+    flushSync(() => {
+      // 确保任务在运行中的任务集合中
+      setRunningTasks((prev) => new Set([...prev, jobId]));
+
+      // 立即更新任务状态为"运行中"，提供即时的用户反馈
+      const updatedJob = {
+        lastExecution: {
+          status: 'running' as ExecutionStatus,
+          time: new Date().toISOString(),
+        },
+      };
+
+      setJobs((prev) =>
+        prev.map((job) =>
+          job.id === jobId
+            ? {
+                ...job,
+                ...updatedJob,
+              }
+            : job,
+        ),
+      );
+
+      setFilteredJobs((prev) =>
+        prev.map((job) =>
+          job.id === jobId
+            ? {
+                ...job,
+                ...updatedJob,
+              }
+            : job,
+        ),
+      );
+    });
+
+    // 定义状态更新函数，用于后续的状态恢复
+    const updateJobStatus = (status: ExecutionStatus, lastExecution?: any) => {
+      const updatedJob = {
+        lastExecution: lastExecution || {
+          status,
+          time: new Date().toISOString(),
+        },
+      };
+
+      setJobs((prev) =>
+        prev.map((job) =>
+          job.id === jobId
+            ? {
+                ...job,
+                ...updatedJob,
+              }
+            : job,
+        ),
+      );
+
+      setFilteredJobs((prev) =>
+        prev.map((job) =>
+          job.id === jobId
+            ? {
+                ...job,
+                ...updatedJob,
+              }
+            : job,
+        ),
+      );
+    };
+
     try {
       // 调用真实API
       const response = await fetch(`/api/backup/execute/${jobId}`, {
@@ -1233,50 +1323,48 @@ const JobList: React.FC = () => {
       const result = await response.json();
 
       if (result.success) {
-        // 更新任务状态为"运行中"
-        setJobs(
-          jobs.map((job) =>
-            job.id === jobId
-              ? {
-                  ...job,
-                  lastExecution: {
-                    status: 'running',
-                    time: new Date().toISOString(),
-                  },
-                }
-              : job,
-          ),
-        );
-
-        // 更新筛选后的列表
-        setFilteredJobs(
-          filteredJobs.map((job) =>
-            job.id === jobId
-              ? {
-                  ...job,
-                  lastExecution: {
-                    status: 'running',
-                    time: new Date().toISOString(),
-                  },
-                }
-              : job,
-          ),
-        );
-
         message.success(intl.formatMessage({ id: 'pages.backup.messages.taskRunning' }));
 
         // 刷新任务列表，以获取最新状态
         setTimeout(async () => {
           await fetchJobs();
+          // 移除运行状态标记
+          setRunningTasks((prev) => {
+            const newSet = new Set(prev);
+            newSet.delete(jobId);
+            return newSet;
+          });
         }, 3000);
       } else {
         console.error('运行任务失败:', result.message);
+
+        // API失败时，恢复到之前的状态
+        updateJobStatus(originalJob.lastExecution?.status || 'not_run', originalJob.lastExecution);
+
+        // 移除运行状态标记
+        setRunningTasks((prev) => {
+          const newSet = new Set(prev);
+          newSet.delete(jobId);
+          return newSet;
+        });
+
         message.error(
           result.message || intl.formatMessage({ id: 'pages.backup.messages.taskFailed' }),
         );
       }
     } catch (error) {
       console.error('运行任务失败:', error);
+
+      // 网络错误时，恢复到之前的状态
+      updateJobStatus(originalJob.lastExecution?.status || 'not_run', originalJob.lastExecution);
+
+      // 移除运行状态标记
+      setRunningTasks((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(jobId);
+        return newSet;
+      });
+
       message.error(intl.formatMessage({ id: 'pages.backup.messages.taskFailed' }));
     }
   };
@@ -1495,13 +1583,19 @@ const JobList: React.FC = () => {
           <Tooltip title={intl.formatMessage({ id: 'pages.backup.tooltip.runNow' })}>
             <Button
               type="text"
-              icon={<CloudUploadOutlined />}
+              icon={runningTasks.has(record.id) ? <SyncOutlined spin /> : <CloudUploadOutlined />}
               disabled={
+                runningTasks.has(record.id) ||
                 (record.lastExecution && record.lastExecution.status === 'running') ||
                 record.status === 'paused'
               }
               onClick={(e) => {
                 e.stopPropagation();
+                // 立即设置loading状态
+                flushSync(() => {
+                  setRunningTasks((prev) => new Set([...prev, record.id]));
+                });
+                // 然后调用API
                 runJobNow(record.id);
               }}
               className="action-button"
@@ -1665,6 +1759,9 @@ const JobList: React.FC = () => {
         });
 
         setJobs(mappedData);
+
+        // 清理运行状态标记，因为我们获取到了最新的实际状态
+        setRunningTasks(new Set());
 
         // 如果有搜索条件，应用搜索过滤
         if (searchText) {
@@ -3336,7 +3433,7 @@ const JobList: React.FC = () => {
                           })}
                           onMouseEnter={(e) => {
                             // 当鼠标悬停时显示正则表达式匹配示例
-                            const pattern = e.target.value;
+                            const pattern = (e.target as HTMLInputElement).value;
                             if (pattern) {
                               try {
                                 const regex = new RegExp(pattern);

@@ -74,7 +74,7 @@ export default {
   'pages.backup.form.fileNamePattern': 'Pola Nama File (Regex)',
   'pages.backup.form.fileNamePattern.required': 'Harap masukkan pola nama file',
   'pages.backup.form.fileNamePattern.placeholder':
-    'contoh: ^backup_\\d{4}-\\d{2}-\\d{2}_.*\\.json$',
+    'contoh: ^{table}_\\d{4}-\\d{2}-\\d{2}_.*\\.json$',
   'pages.backup.form.fileNamePattern.invalid': 'Ekspresi reguler tidak valid',
   'pages.backup.form.fileNamePattern.tooltip':
     'Pola ekspresi reguler untuk mencocokkan nama file backup. Arahkan mouse untuk melihat contoh pencocokan.',

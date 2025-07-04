@@ -71,7 +71,7 @@ export default {
   // Backup related internationalization
   'pages.backup.form.fileNamePattern': 'File Name Pattern (Regex)',
   'pages.backup.form.fileNamePattern.required': 'Please enter file name pattern',
-  'pages.backup.form.fileNamePattern.placeholder': 'e.g., ^backup_\\d{4}-\\d{2}-\\d{2}_.*\\.json$',
+  'pages.backup.form.fileNamePattern.placeholder': 'e.g., ^{table}_\\d{4}-\\d{2}-\\d{2}_.*\\.json$',
   'pages.backup.form.fileNamePattern.invalid': 'Invalid regular expression',
   'pages.backup.form.fileNamePattern.tooltip':
     'Regular expression pattern to match backup file names. Hover to see matching examples.',
